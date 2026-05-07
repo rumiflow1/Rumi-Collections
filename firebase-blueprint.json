@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "RuleOfSeven": {
+      "title": "Rule of Seven",
+      "description": "Standard content control object",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "font": { "type": "string" },
+        "color": { "type": "string" },
+        "size": { "type": "string" },
+        "background": { "type": "string" },
+        "link": { "type": "string" },
+        "isVisible": { "type": "boolean" }
+      }
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Product details and inventory",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "price": { "type": "number" },
+        "discountPrice": { "type": "number" },
+        "description": { "type": "string" },
+        "colors": { "type": "array", "items": { "type": "string" } },
+        "sizes": { "type": "array", "items": { "type": "string" } },
+        "sizeGuide": { "type": "string" },
+        "details": { "type": "string" },
+        "shippingReturns": { "type": "string" },
+        "fabricCare": { "type": "string" },
+        "styleNotes": { "type": "string" },
+        "collectionId": { "type": "string" },
+        "isNewArrival": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "showOnHome": { "type": "boolean" },
+        "stock": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Collection": {
+      "title": "Collection",
+      "description": "Product collections",
+      "type": "object",
+      "properties": {
+        "name": { "$ref": "RuleOfSeven" },
+        "image": { "type": "string" },
+        "slug": { "type": "string" }
+      }
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer orders",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["Packed", "On the way", "Delivered"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "customerInfo": { "type": "object" }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and tracking",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "signupTime": { "type": "string", "format": "date-time" },
+        "behavior": { "type": "object" }
+      }
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Customer reviews",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "profession": { "type": "string" },
+        "text": { "type": "string" },
+        "rating": { "type": "integer" },
+        "productId": { "type": "string" }
+      }
+    },
+    "TrustBadge": {
+      "title": "Trust Badge",
+      "description": "Trust badges for the site",
+      "type": "object",
+      "properties": {
+        "title": { "$ref": "RuleOfSeven" },
+        "icon": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/content/{contentId}": {
+      "schema": "object",
+      "description": "Dynamic UI content"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product catalog"
+    },
+    "/collections/{collectionId}": {
+      "schema": "Collection",
+      "description": "Product collections"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and activity"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Customer reviews"
+    },
+    "/trustBadges/{badgeId}": {
+      "schema": "TrustBadge",
+      "description": "Trust badges"
+    }
+  }
+}

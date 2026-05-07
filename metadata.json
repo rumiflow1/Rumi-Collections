@@ -1,0 +1,5 @@
+{
+  "name": "Luxe Attire",
+  "description": "A premium, AI-powered clothing e-commerce platform with personalized style recommendations.",
+  "requestFramePermissions": ["camera"]
+}
