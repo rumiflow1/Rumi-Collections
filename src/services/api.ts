@@ -1,13 +1,53 @@
 import axios from 'axios';
 import { productionFallbackConfig } from '../config/productionFallback';
 
-// Production and local development both use the same /api contract.
 export const API_URL = '/api';
+
+const mergeConfig = (data: any) => ({
+  ...productionFallbackConfig,
+  ...(data || {}),
+  announcementBar: { ...productionFallbackConfig.announcementBar, ...(data?.announcementBar || {}) },
+  header: { ...productionFallbackConfig.header, ...(data?.header || {}) },
+  purchaseNotifications: { ...productionFallbackConfig.purchaseNotifications, ...(data?.purchaseNotifications || {}) },
+  heroBanner: { ...productionFallbackConfig.heroBanner, ...(data?.heroBanner || {}) },
+  newArrivals: { ...productionFallbackConfig.newArrivals, ...(data?.newArrivals || {}) },
+  featuredArrivals: { ...productionFallbackConfig.featuredArrivals, ...(data?.featuredArrivals || {}) },
+  featuredCollections: { ...productionFallbackConfig.featuredCollections, ...(data?.featuredCollections || {}) },
+  customerReviews: { ...productionFallbackConfig.customerReviews, ...(data?.customerReviews || {}) },
+  trustBadges: { ...productionFallbackConfig.trustBadges, ...(data?.trustBadges || {}) },
+  footer: { ...productionFallbackConfig.footer, ...(data?.footer || {}) },
+  aiConcierge: { ...productionFallbackConfig.aiConcierge, ...(data?.aiConcierge || {}) },
+  notifications: { ...productionFallbackConfig.notifications, ...(data?.notifications || {}) },
+  settings: { ...productionFallbackConfig.settings, ...(data?.settings || {}) },
+  pages: { ...productionFallbackConfig.pages, ...(data?.pages || {}) },
+  elements: { ...productionFallbackConfig.elements, ...(data?.elements || {}) },
+});
 
 const api = axios.create({
   baseURL: API_URL,
   timeout: 20000,
   headers: { 'Content-Type': 'application/json' },
+});
+
+// The existing admin screens use `image`, while the production backend's
+// multer handler expects `file`. Add the canonical field without changing UI code.
+api.interceptors.request.use((config) => {
+  if (config.url?.includes('/admin/upload') && typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    const image = config.data.get('image');
+    if (image && !config.data.get('file')) config.data.append('file', image);
+  }
+  return config;
+});
+
+// Normalize legacy backend responses so existing frontend screens continue to work.
+api.interceptors.response.use((response) => {
+  if (response.config.url?.endsWith('/config')) {
+    response.data = mergeConfig(response.data);
+  }
+  if (response.config.url?.includes('/admin/upload') && response.data?.url && !response.data.imageUrl) {
+    response.data.imageUrl = response.data.url;
+  }
+  return response;
 });
 
 export const authApi = {
@@ -21,7 +61,6 @@ export const authApi = {
 export const orderApi = {
   placeOrder: (orderData: any) => api.post('/orders/create', {
     ...orderData,
-    // Keep both shapes for compatibility with the current production backend.
     shippingDetails: {
       firstName: orderData.fullName || '',
       lastName: '',
@@ -43,34 +82,8 @@ export const orderApi = {
 export const adminApi = {
   getOrders: () => api.get('/admin/orders'),
   getCustomers: () => api.get('/admin/customers'),
-  getConfig: async () => {
-    const response = await api.get('/config');
-    // Production may contain a partial legacy document. Merge it over the
-    // complete frontend defaults so no home-page section disappears.
-    const merged = {
-      ...productionFallbackConfig,
-      ...(response.data || {}),
-      announcementBar: { ...productionFallbackConfig.announcementBar, ...(response.data?.announcementBar || {}) },
-      header: { ...productionFallbackConfig.header, ...(response.data?.header || {}) },
-      purchaseNotifications: { ...productionFallbackConfig.purchaseNotifications, ...(response.data?.purchaseNotifications || {}) },
-      heroBanner: { ...productionFallbackConfig.heroBanner, ...(response.data?.heroBanner || {}) },
-      newArrivals: { ...productionFallbackConfig.newArrivals, ...(response.data?.newArrivals || {}) },
-      featuredArrivals: { ...productionFallbackConfig.featuredArrivals, ...(response.data?.featuredArrivals || {}) },
-      featuredCollections: { ...productionFallbackConfig.featuredCollections, ...(response.data?.featuredCollections || {}) },
-      customerReviews: { ...productionFallbackConfig.customerReviews, ...(response.data?.customerReviews || {}) },
-      trustBadges: { ...productionFallbackConfig.trustBadges, ...(response.data?.trustBadges || {}) },
-      footer: { ...productionFallbackConfig.footer, ...(response.data?.footer || {}) },
-      aiConcierge: { ...productionFallbackConfig.aiConcierge, ...(response.data?.aiConcierge || {}) },
-      notifications: { ...productionFallbackConfig.notifications, ...(response.data?.notifications || {}) },
-      settings: { ...productionFallbackConfig.settings, ...(response.data?.settings || {}) },
-      pages: { ...productionFallbackConfig.pages, ...(response.data?.pages || {}) },
-      elements: { ...productionFallbackConfig.elements, ...(response.data?.elements || {}) },
-    };
-    return { ...response, data: merged };
-  },
-  // Backend's canonical write endpoint is /api/admin/config.
+  getConfig: () => api.get('/config'),
   updateConfig: (config: any) => api.post('/admin/config', config),
-  // Backend's canonical product-create endpoint is /api/admin/products.
   addProduct: (product: any) => api.post('/admin/products', product),
   updateProduct: (id: string, product: any) => api.put(`/admin/products/${id}`, product),
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
