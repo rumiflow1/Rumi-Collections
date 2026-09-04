@@ -41,9 +41,38 @@ const defaultGlobalConfig: Config = {
   notifications: { isLive: true, broadcastMessage: '', emailFrequency: 'Weekly' }, settings: { baseCurrency: 'PKR' }, pages: { shippingPolicy: '', privacyPolicy: '', returnPolicy: '', termsOfService: '', faq: '' }
 };
 
+const asText = (value: any, fallback = ''): string => {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (value && typeof value === 'object') return asText(value.content ?? value.text ?? value.value ?? value.title, fallback);
+  return fallback;
+};
+
+const sanitizeConfig = (config: any): Config => {
+  const merged = mergeProductionConfig(config || {});
+  const elements = Object.fromEntries(Object.entries(merged.elements || {}).map(([key, raw]: any) => [key, {
+    ...(raw || {}),
+    content: asText(raw?.content ?? raw?.text, ''),
+    color: asText(raw?.color, ''),
+    fontFamily: asText(raw?.fontFamily, ''),
+    fontSize: asText(raw?.fontSize, ''),
+    link: asText(raw?.link, ''),
+    background: asText(raw?.background, ''),
+    isVisible: raw?.isVisible !== false,
+  }]));
+  return {
+    ...merged,
+    elements,
+    footer: {
+      ...(merged.footer || {}),
+      description: asText(merged.footer?.description, ''),
+      copyright: asText(merged.footer?.copyright, ''),
+    },
+  } as Config;
+};
+
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const [SiteConfig, setSiteConfig] = useState<Config>(() => {
-    try { const cached = localStorage.getItem('luxe_site_config'); return cached ? mergeProductionConfig(JSON.parse(cached)) : defaultGlobalConfig; }
+    try { const cached = localStorage.getItem('luxe_site_config'); return cached ? sanitizeConfig(JSON.parse(cached)) : defaultGlobalConfig; }
     catch { return defaultGlobalConfig; }
   });
   const [loading, setLoading] = useState(true);
@@ -51,7 +80,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await axios.get('/api/config');
       if (response.data) {
-        const merged = mergeProductionConfig(response.data);
+        const merged = sanitizeConfig(response.data);
         setSiteConfig(merged);
         localStorage.setItem('luxe_site_config', JSON.stringify(merged));
       }
