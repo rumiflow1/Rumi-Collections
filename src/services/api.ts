@@ -23,14 +23,23 @@ const mergeConfig = (data: any) => ({
   elements: { ...productionFallbackConfig.elements, ...(data?.elements || {}) },
 });
 
+const normalizeProduct = (product: any) => {
+  const image = product.image || product.images?.[0] || '';
+  return {
+    ...product,
+    title: product.title || product.name || 'New Product',
+    image,
+    images: product.images?.length ? product.images : (image ? [image] : []),
+  };
+};
+
 const api = axios.create({
   baseURL: API_URL,
   timeout: 20000,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// The existing admin screens use `image`, while the production backend's
-// multer handler expects `file`. Add the canonical field without changing UI code.
+// Existing admin screens use `image`; production multer expects `file`.
 api.interceptors.request.use((config) => {
   if (config.url?.includes('/admin/upload') && typeof FormData !== 'undefined' && config.data instanceof FormData) {
     const image = config.data.get('image');
@@ -39,11 +48,9 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Normalize legacy backend responses so existing frontend screens continue to work.
+// Normalize legacy backend responses used by the existing UI.
 api.interceptors.response.use((response) => {
-  if (response.config.url?.endsWith('/config')) {
-    response.data = mergeConfig(response.data);
-  }
+  if (response.config.url?.endsWith('/config')) response.data = mergeConfig(response.data);
   if (response.config.url?.includes('/admin/upload') && response.data?.url && !response.data.imageUrl) {
     response.data.imageUrl = response.data.url;
   }
@@ -84,8 +91,8 @@ export const adminApi = {
   getCustomers: () => api.get('/admin/customers'),
   getConfig: () => api.get('/config'),
   updateConfig: (config: any) => api.post('/admin/config', config),
-  addProduct: (product: any) => api.post('/admin/products', product),
-  updateProduct: (id: string, product: any) => api.put(`/admin/products/${id}`, product),
+  addProduct: (product: any) => api.post('/admin/products', normalizeProduct(product)),
+  updateProduct: (id: string, product: any) => api.put(`/admin/products/${id}`, normalizeProduct(product)),
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
   logCustomerActivity: (data: any) => api.post('/admin/customers/log', data),
 };
