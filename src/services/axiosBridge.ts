@@ -29,6 +29,20 @@ const normalizeConfigShape = (config: any) => {
   if (Array.isArray(next.header.navLinks)) {
     next.header.navLinks = next.header.navLinks.map((item: any) => ({ ...item, label: textValue(item?.label, '') }));
   }
+  if (Array.isArray(next.heroBanner?.slides)) {
+    next.heroBanner.slides = next.heroBanner.slides.map((slide: any) => ({
+      ...slide,
+      title: textValue(slide?.title, ''),
+      subtitle: textValue(slide?.subtitle, ''),
+      btnText: textValue(slide?.btnText, 'Explore Now'),
+    }));
+  }
+  if (Array.isArray(next.featuredCollections?.items)) {
+    next.featuredCollections.items = next.featuredCollections.items.map((item: any) => ({
+      ...item,
+      name: textValue(item?.name, ''),
+    }));
+  }
   return next;
 };
 
@@ -81,8 +95,7 @@ const compressImageFile = async (file: File): Promise<File> => {
   });
 };
 
-// The app still has legacy screens that use the global axios instance.
-// Keep those screens compatible with the production API without rewriting their UI.
+// Legacy admin screens use the global axios instance. Normalize their API payloads too.
 axios.interceptors.request.use(async (config) => {
   if (config.url?.includes('/admin/upload') && typeof FormData !== 'undefined' && config.data instanceof FormData) {
     const current = config.data.get('file') || config.data.get('image');
