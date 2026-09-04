@@ -1,6 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import './services/api';
+import './services/axiosBridge';
 import App from './App.tsx';
 import './index.css';
 
