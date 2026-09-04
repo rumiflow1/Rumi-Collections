@@ -1,14 +1,12 @@
 import axios from 'axios';
 
-// Live website par ye khud hi /api pakar lega
-export const API_URL = "/api";
+// Production and local development both use the same /api contract.
+export const API_URL = '/api';
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 20000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
 export const authApi = {
@@ -20,19 +18,21 @@ export const authApi = {
 };
 
 export const orderApi = {
-  placeOrder: (orderData: any) => api.post('/orders/create', orderData), // Note: Changed to match your server.ts
+  placeOrder: (orderData: any) => api.post('/orders/create', orderData),
   updateStatus: (id: string, status: string) => api.put(`/admin/orders/${id}/status`, { status }),
-  getUserOrders: (userId: string) => api.get(`/admin/orders?userId=${userId}`),
+  getUserOrders: (userId: string) => api.get(`/admin/orders?userId=${encodeURIComponent(userId)}`),
 };
 
 export const adminApi = {
   getOrders: () => api.get('/admin/orders'),
   getCustomers: () => api.get('/admin/customers'),
   getConfig: () => api.get('/config'),
-  updateConfig: (config: any) => api.post('/config/update', config), // Match server.ts
-  addProduct: (product: any) => api.post('/products/add', product), // Match server.ts
+  // Backend's canonical write endpoint is /api/admin/config.
+  updateConfig: (config: any) => api.post('/admin/config', config),
+  // Backend's canonical product-create endpoint is /api/admin/products.
+  addProduct: (product: any) => api.post('/admin/products', product),
   updateProduct: (id: string, product: any) => api.put(`/admin/products/${id}`, product),
-  deleteProduct: (id: string) => api.delete(`/products/${id}`),
+  deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
   logCustomerActivity: (data: any) => api.post('/admin/customers/log', data),
 };
 
@@ -41,9 +41,19 @@ export const productApi = {
   getById: (id: string) => api.get(`/products/${id}`),
 };
 
-// ADDED: Added cartApi helper to resolve build errors in AppContext.tsx
 export const cartApi = {
   reportAbandoned: (cartData: any) => api.post('/cart/abandoned', cartData),
+};
+
+export const uploadApi = {
+  uploadImage: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/admin/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
 
 export default api;
