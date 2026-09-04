@@ -28,6 +28,7 @@ const normalizeProduct = (product: any) => {
   return {
     ...product,
     title: product.title || product.name || 'New Product',
+    name: product.name || product.title || 'New Product',
     image,
     images: product.images?.length ? product.images : (image ? [image] : []),
   };
@@ -39,7 +40,6 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Existing admin screens use `image`; production multer expects `file`.
 api.interceptors.request.use((config) => {
   if (config.url?.includes('/admin/upload') && typeof FormData !== 'undefined' && config.data instanceof FormData) {
     const image = config.data.get('image');
@@ -48,11 +48,13 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Normalize legacy backend responses used by the existing UI.
 api.interceptors.response.use((response) => {
   if (response.config.url?.endsWith('/config')) response.data = mergeConfig(response.data);
   if (response.config.url?.includes('/admin/upload') && response.data?.url && !response.data.imageUrl) {
     response.data.imageUrl = response.data.url;
+  }
+  if (response.config.url?.endsWith('/admin/customers') && Array.isArray(response.data)) {
+    response.data = { users: response.data, logs: [] };
   }
   return response;
 });
@@ -92,7 +94,19 @@ export const adminApi = {
   getConfig: () => api.get('/config'),
   updateConfig: (config: any) => api.post('/admin/config', config),
   addProduct: (product: any) => api.post('/admin/products', normalizeProduct(product)),
-  updateProduct: (id: string, product: any) => api.put(`/admin/products/${id}`, normalizeProduct(product)),
+  // The historical production API has no PUT product endpoint. Try it first,
+  // then safely fall back to delete+create so the existing admin editor still
+  // works against that deployment without changing its UI.
+  updateProduct: async (id: string, product: any) => {
+    const payload = normalizeProduct(product);
+    try {
+      return await api.put(`/admin/products/${id}`, payload);
+    } catch (error: any) {
+      if (error?.response?.status !== 404 && error?.response?.status !== 405) throw error;
+      await api.delete(`/admin/products/${id}`);
+      return await api.post('/admin/products', payload);
+    }
+  },
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
   logCustomerActivity: (data: any) => api.post('/admin/customers/log', data),
 };
