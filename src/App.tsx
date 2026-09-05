@@ -38,11 +38,7 @@ const AdminRoute = ({ children, superAdminOnly = false }: { children: React.Reac
 
 function ScrollToTop() {
   const { pathname, search } = useLocation();
-  useEffect(() => {
-    window.scrollTo(0, 0);
-    const timer = setTimeout(() => window.scrollTo(0, 0), 100);
-    return () => clearTimeout(timer);
-  }, [pathname, search]);
+  useEffect(() => { window.scrollTo(0, 0); const timer = setTimeout(() => window.scrollTo(0, 0), 100); return () => clearTimeout(timer); }, [pathname, search]);
   return null;
 }
 
@@ -52,39 +48,30 @@ function AppContent() {
   const isHome = location.pathname === '/';
   const isAdminPath = location.pathname.startsWith('/admin') || location.pathname.startsWith('/e-admin');
 
-  if (isAdminPath) {
-    return <Routes><Route path="/admin" element={<AdminRoute><LuxeAdmin /></AdminRoute>} /><Route path="/e-admin" element={<AdminRoute><LuxeAdmin /></AdminRoute>} /><Route path="*" element={<Navigate to="/admin" />} /></Routes>;
-  }
+  if (isAdminPath) return <Routes><Route path="/admin" element={<AdminRoute><LuxeAdmin /></AdminRoute>} /><Route path="/e-admin" element={<AdminRoute><LuxeAdmin /></AdminRoute>} /><Route path="*" element={<Navigate to="/admin" />} /></Routes>;
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <AnnouncementBar />
-      <Header />
-      <SearchOverlay />
-      <div className={`flex-grow ${!isHome ? 'pt-32' : ''}`}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/wishlist" element={<Wishlist />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/contact" element={<Support />} />
-          <Route path="/support" element={<Support />} />
-          <Route path="/shipping" element={<Support />} />
-          <Route path="/returns" element={<Support />} />
-          <Route path="/faq" element={<Support />} />
-          <Route path="*" element={<Home />} />
-        </Routes>
-      </div>
-      <Footer />
-      <AIStylistPro />
-      <PurchaseNotification />
-      <NewsletterPopup />
+  return <div className="min-h-screen flex flex-col">
+    <AnnouncementBar /><Header /><SearchOverlay />
+    <div className={`flex-grow ${!isHome ? 'pt-32' : ''}`}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/wishlist" element={<Wishlist />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/contact" element={<Support />} />
+        <Route path="/support" element={<Support />} />
+        <Route path="/shipping" element={<Navigate to="/support?tab=shipping" replace />} />
+        <Route path="/returns" element={<Navigate to="/support?tab=returns" replace />} />
+        <Route path="/faq" element={<Navigate to="/support?tab=faq" replace />} />
+        <Route path="*" element={<Home />} />
+      </Routes>
     </div>
-  );
+    <Footer /><AIStylistPro /><PurchaseNotification /><NewsletterPopup />
+  </div>;
 }
 
 export default function App() {
