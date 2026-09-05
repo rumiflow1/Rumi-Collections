@@ -1,22 +1,71 @@
-import React, { useState, useEffect } from 'react';
-import { useConfig } from '../../context/ConfigContext';
+import React, { useEffect, useState } from 'react';
+import { Globe, Lock, Save, RefreshCw, Shield, Truck } from 'lucide-react';
 import axios from 'axios';
-import { Settings, Save, RefreshCw, Shield, Globe, Database, Server, Lock, Truck } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useConfig } from '../../context/ConfigContext';
 import type { Currency } from '../../context/AppContext';
 
-const CURRENCIES: Currency[]=['USD','PKR','EUR','GBP','INR','SAR','AED'];
-export default function AdminSettings(){
- const {SiteConfig,loading,refreshConfig}=useConfig();const [localConfig,setLocalConfig]=useState<any>(null);const [saving,setSaving]=useState(false);const [message,setMessage]=useState('');
- useEffect(()=>{if(SiteConfig)setLocalConfig(JSON.parse(JSON.stringify(SiteConfig)));},[SiteConfig]);
- const handleSave=async()=>{setSaving(true);setMessage('');try{await axios.post('/api/admin/config',localConfig);await refreshConfig();setMessage('SUCCESS: Store settings synchronized.');setTimeout(()=>setMessage(''),3000);}catch(error){console.error('Error saving settings:',error);setMessage('Error: Settings sync failed.');}finally{setSaving(false);}};
- const updateSectionField=(section:string,field:string,value:any)=>setLocalConfig((prev:any)=>({...prev,[section]:{...prev[section],[field]:value}}));
- if(loading||!localConfig)return <div className="flex justify-center p-20"><RefreshCw className="animate-spin text-brand-gold" size={32}/></div>;
- const storeCurrency=(localConfig.settings?.baseCurrency||'PKR') as Currency;
- return <div className="space-y-8 max-w-6xl mx-auto pb-20"><div className="bg-[#111] p-8 rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl"><div className="flex items-center gap-5"><div className="w-16 h-16 bg-brand-gold/10 text-brand-gold rounded-2xl flex items-center justify-center border border-brand-gold/20"><Settings size={32}/></div><div><h2 className="text-2xl font-serif font-bold text-white uppercase tracking-tighter">SYSTEM <span className="text-brand-gold">SETTINGS</span></h2><p className="text-[10px] text-gray-500 font-bold tracking-[0.3em] uppercase">Store identity, currency & logistics</p></div></div><div className="flex items-center gap-4"><AnimatePresence>{message&&<motion.div initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0}} className="text-xs font-bold text-brand-gold uppercase tracking-widest bg-brand-gold/10 px-4 py-2 rounded-lg border border-brand-gold/20">{message}</motion.div>}</AnimatePresence><button onClick={handleSave} disabled={saving} className="px-8 py-3 bg-brand-gold text-black rounded-xl font-bold uppercase text-[10px] tracking-widest hover:scale-105 transition-all shadow-lg flex items-center gap-2">{saving?<RefreshCw className="animate-spin" size={16}/>:<Save size={16}/>}Synchronize Settings</button></div></div>
- <div className="grid grid-cols-1 lg:grid-cols-2 gap-8"><div className="bg-[#111] p-8 rounded-[2rem] border border-white/5 space-y-8"><h3 className="text-lg font-serif font-bold text-white flex items-center gap-2"><Globe size={20} className="text-brand-gold"/> Brand Identity</h3><div className="space-y-6"><InputGroup label="Brand Name" value={localConfig.header.logoText} onChange={(v:string)=>updateSectionField('header','logoText',v)}/><div className="grid grid-cols-2 gap-6"><InputGroup label="Primary Brand Color" value={localConfig.header.logoColor} onChange={(v:string)=>updateSectionField('header','logoColor',v)}/><div className="space-y-2"><label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Store Currency</label><select value={storeCurrency} onChange={e=>setLocalConfig((prev:any)=>({...prev,settings:{...prev.settings,baseCurrency:e.target.value,currencyOptions:CURRENCIES}}))} className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-brand-gold outline-none">{CURRENCIES.map(c=><option key={c} value={c}>{c}</option>)}</select></div></div><div className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl space-y-4"><p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Support Coordinates</p><div className="space-y-4"><input className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-xs text-white" value={localConfig.settings?.supportEmail||'support@denfit.shop'} onChange={e=>setLocalConfig((p:any)=>({...p,settings:{...p.settings,supportEmail:e.target.value}}))}/><input className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-xs text-white" value={localConfig.settings?.supportPhone||''} onChange={e=>setLocalConfig((p:any)=>({...p,settings:{...p.settings,supportPhone:e.target.value}}))}/><input className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-xs text-white" value={localConfig.settings?.hqAddress||''} onChange={e=>setLocalConfig((p:any)=>({...p,settings:{...p.settings,hqAddress:e.target.value}}))}/></div></div></div></div>
- <div className="bg-[#111] p-8 rounded-[2rem] border border-white/5 space-y-8"><h3 className="text-lg font-serif font-bold text-white flex items-center gap-2"><Lock size={20} className="text-brand-gold"/> Security & Infrastructure</h3><div className="space-y-6"><div className="p-6 bg-red-500/5 border border-red-500/10 rounded-2xl flex items-center gap-4"><div className="p-3 bg-red-500/10 text-red-500 rounded-xl"><Shield size={20}/></div><div><p className="text-xs font-bold text-white">System Restriction</p><p className="text-[10px] text-gray-500 uppercase font-medium">Access limited to authorized admin identity</p></div></div><div className="grid grid-cols-2 gap-6"><div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl space-y-2"><div className="flex items-center gap-2 text-brand-gold"><Database size={14}/><span className="text-[10px] font-bold uppercase tracking-widest">Database</span></div><p className="text-xs text-white font-mono">MONGODB</p><p className="text-[8px] text-green-500 font-bold uppercase">Synchronized</p></div><div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl space-y-2"><div className="flex items-center gap-2 text-brand-gold"><Server size={14}/><span className="text-[10px] font-bold uppercase tracking-widest">Engine</span></div><p className="text-xs text-white font-mono">Node.js v20.x</p><p className="text-[8px] text-green-500 font-bold uppercase">Operational</p></div></div></div></div>
- <div className="bg-[#111] p-8 rounded-[2rem] border border-white/5 space-y-8 lg:col-span-2"><h3 className="text-lg font-serif font-bold text-white flex items-center gap-2"><Truck size={20} className="text-brand-gold"/> Shipping & Logistics Control</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-8">{['domestic','international'].map(type=><div key={type} className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl space-y-6"><div className="flex justify-between items-center"><h4 className="text-xs font-bold text-brand-gold uppercase tracking-widest">{type==='domestic'?'Domestic':'International'}</h4><span className="text-[8px] bg-brand-gold/10 text-brand-gold px-2 py-1 rounded-full border border-brand-gold/20 font-bold uppercase">Active</span></div><div className="grid grid-cols-2 gap-4"><MoneyInput label="Free Shipping Threshold" currency={storeCurrency} value={localConfig.settings?.shippingRules?.[type]?.freeThreshold||0} onChange={(v:number)=>setLocalConfig((p:any)=>({...p,settings:{...p.settings,shippingRules:{...(p.settings?.shippingRules||{}),[type]:{...(p.settings?.shippingRules?.[type]||{}),freeThreshold:v}}}})}/><MoneyInput label="Standard Flat Fee" currency={storeCurrency} value={localConfig.settings?.shippingRules?.[type]?.flatFee||0} onChange={(v:number)=>setLocalConfig((p:any)=>({...p,settings:{...p.settings,shippingRules:{...(p.settings?.shippingRules||{}),[type]:{...(p.settings?.shippingRules?.[type]||{}),flatFee:v}}}})}/></div><p className="text-[9px] text-gray-500 italic">All checkout and email totals use the customer's selected currency.</p></div>)}</div></div></div></div>;
+const CURRENCIES: Currency[] = ['USD', 'PKR', 'EUR', 'GBP', 'INR', 'SAR', 'AED'];
+
+export default function AdminSettings() {
+  const { SiteConfig, loading, refreshConfig } = useConfig();
+  const [config, setConfig] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (SiteConfig) setConfig(JSON.parse(JSON.stringify(SiteConfig)));
+  }, [SiteConfig]);
+
+  const save = async () => {
+    if (!config) return;
+    setSaving(true);
+    try {
+      await axios.post('/api/admin/config', config);
+      await refreshConfig();
+      setMessage('Settings synchronized.');
+    } catch (error) {
+      console.error('[admin-settings]', error);
+      setMessage('Settings could not be synchronized.');
+    } finally {
+      setSaving(false);
+      window.setTimeout(() => setMessage(''), 3000);
+    }
+  };
+
+  const setSetting = (key: string, value: any) => setConfig((prev: any) => ({ ...prev, settings: { ...(prev?.settings || {}), [key]: value } }));
+  const setShipping = (zone: string, key: string, value: number) => setConfig((prev: any) => ({ ...prev, settings: { ...(prev?.settings || {}), shippingRules: { ...(prev?.settings?.shippingRules || {}), [zone]: { ...(prev?.settings?.shippingRules?.[zone] || {}), [key]: value } } } }));
+
+  if (loading || !config) return <div className="flex justify-center p-20"><RefreshCw className="animate-spin text-brand-gold" size={32} /></div>;
+  const currency = CURRENCIES.includes(config.settings?.baseCurrency) ? config.settings.baseCurrency : 'PKR';
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-8 pb-20">
+      <section className="rounded-[2rem] bg-[#111] border border-white/5 p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div><p className="text-[10px] uppercase tracking-[.3em] text-brand-gold font-bold">DENFIT control center</p><h2 className="text-3xl font-serif font-bold text-white mt-2">Store Settings</h2><p className="text-xs text-gray-500 mt-2">Brand identity, currency and fulfilment rules.</p></div>
+        <button onClick={save} disabled={saving} className="px-7 py-3 bg-brand-gold text-black rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">{saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />} Synchronize</button>
+      </section>
+
+      {message && <div className="rounded-xl border border-brand-gold/20 bg-brand-gold/5 px-5 py-3 text-xs font-bold uppercase tracking-widest text-brand-gold">{message}</div>}
+
+      <section className="rounded-[2rem] bg-[#111] border border-white/5 p-8 space-y-6">
+        <h3 className="text-lg font-serif font-bold text-white flex items-center gap-2"><Globe size={19} className="text-brand-gold" /> Brand & Currency</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <Field label="Brand Name" value={config.header?.logoText || 'DENFIT'} onChange={(value) => setConfig((p: any) => ({ ...p, header: { ...(p.header || {}), logoText: value } }))} />
+          <Field label="Support Email" value={config.settings?.supportEmail || 'support@denfit.shop'} onChange={(value) => setSetting('supportEmail', value)} />
+          <div><label className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-2">Store Currency</label><select value={currency} onChange={(e) => setSetting('baseCurrency', e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white outline-none focus:border-brand-gold">{CURRENCIES.map(code => <option key={code} value={code}>{code}</option>)}</select></div>
+        </div>
+        <div className="rounded-2xl bg-white/[.02] border border-white/5 p-5"><p className="text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-3">Available customer currencies</p><div className="flex flex-wrap gap-2">{CURRENCIES.map(code => <span key={code} className={`px-3 py-1 rounded-full text-[10px] font-bold border ${code === currency ? 'border-brand-gold text-brand-gold bg-brand-gold/5' : 'border-white/10 text-gray-500'}`}>{code}</span>)}</div></div>
+      </section>
+
+      <section className="rounded-[2rem] bg-[#111] border border-white/5 p-8 space-y-6">
+        <h3 className="text-lg font-serif font-bold text-white flex items-center gap-2"><Truck size={19} className="text-brand-gold" /> Shipping Rules</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{(['domestic', 'international'] as const).map(zone => <div key={zone} className="rounded-2xl border border-white/5 bg-white/[.02] p-6 space-y-5"><div><p className="text-xs font-bold uppercase tracking-widest text-brand-gold">{zone === 'domestic' ? 'Domestic' : 'International'}</p><p className="text-[9px] text-gray-500 mt-1">Amounts are stored in {currency} and converted for the customer's selected currency.</p></div><div className="grid grid-cols-2 gap-4"><MoneyField label="Free threshold" currency={currency} value={config.settings?.shippingRules?.[zone]?.freeThreshold || 0} onChange={(value) => setShipping(zone, 'freeThreshold', value)} /><MoneyField label="Flat fee" currency={currency} value={config.settings?.shippingRules?.[zone]?.flatFee || 0} onChange={(value) => setShipping(zone, 'flatFee', value)} /></div></div>)}</div>
+      </section>
+
+      <section className="rounded-[2rem] bg-[#111] border border-white/5 p-8"><h3 className="text-lg font-serif font-bold text-white flex items-center gap-2"><Lock size={19} className="text-brand-gold" /> Security</h3><div className="mt-5 rounded-2xl border border-red-500/10 bg-red-500/5 p-5 flex items-center gap-4"><Shield className="text-red-400" size={22} /><div><p className="text-sm font-bold text-white">Admin access protected</p><p className="text-[10px] uppercase tracking-widest text-gray-500 mt-1">Only authorized identities can access store controls.</p></div></div></section>
+    </div>
+  );
 }
-function InputGroup({label,value,onChange}:{label:string,value:any,onChange:(v:string)=>void}){return <div className="space-y-2"><label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{label}</label><input className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-brand-gold outline-none transition-all" value={value??''} onChange={e=>onChange(e.target.value)}/></div>}
-function MoneyInput({label,currency,value,onChange}:{label:string,currency:string,value:number,onChange:(v:number)=>void}){return <div className="space-y-2"><label className="text-[9px] text-gray-500 uppercase font-black">{label}</label><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">{currency}</span><input type="number" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 pl-12 text-sm text-white focus:border-brand-gold outline-none" value={value} onChange={e=>onChange(Number(e.target.value))}/></div></div>}
+
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <div><label className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-2">{label}</label><input value={value} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white outline-none focus:border-brand-gold" /></div>; }
+function MoneyField({ label, currency, value, onChange }: { label: string; currency: string; value: number; onChange: (value: number) => void }) { return <div><label className="block text-[9px] uppercase tracking-widest text-gray-500 font-bold mb-2">{label} ({currency})</label><input type="number" value={value} onChange={e => onChange(Number(e.target.value))} className="w-full rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white outline-none focus:border-brand-gold" /></div>; }
