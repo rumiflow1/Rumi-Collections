@@ -2,6 +2,7 @@ import axios from 'axios';
 import { productionFallbackConfig } from '../config/productionFallback';
 
 export const API_URL = '/api';
+const PRODUCT_CACHE_KEY = 'denfit_products_cache_v2';
 
 const mergeConfig = (data: any) => ({
   ...productionFallbackConfig,
@@ -25,7 +26,19 @@ const mergeConfig = (data: any) => ({
 
 const normalizeProduct = (product: any) => {
   const image = product.image || product.images?.[0] || '';
-  return { ...product, title: product.title || product.name || 'New Product', name: product.name || product.title || 'New Product', image, images: product.images?.length ? product.images : (image ? [image] : []) };
+  return { ...product, id: product.id || product._id, title: product.title || product.name || 'New Product', name: product.name || product.title || 'New Product', image, images: product.images?.length ? product.images : (image ? [image] : []) };
+};
+
+const readCachedProducts = (): any[] => {
+  try {
+    const raw = localStorage.getItem(PRODUCT_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+};
+
+const writeCachedProducts = (products: any[]) => {
+  try { localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(products.map(normalizeProduct))); } catch { /* cache is optional */ }
 };
 
 const api = axios.create({ baseURL: API_URL, timeout: 20000, headers: { 'Content-Type': 'application/json' } });
@@ -63,7 +76,25 @@ export const adminApi = {
   deleteProduct: (id: string) => api.delete(`/admin/products/${id}`), logCustomerActivity: (data: any) => api.post('/admin/customers/log', data),
 };
 
-export const productApi = { getAll: () => api.get('/products'), getById: (id: string) => api.get(`/products/${id}`) };
+export const productApi = {
+  getAll: async () => {
+    const response = await api.get('/products');
+    const raw = response.data?.products || response.data;
+    if (Array.isArray(raw)) writeCachedProducts(raw);
+    return response;
+  },
+  getById: async (id: string) => {
+    try {
+      return await api.get(`/products/${encodeURIComponent(id)}`);
+    } catch (error: any) {
+      const cached = readCachedProducts();
+      const match = cached.find((product: any) => String(product.id || product._id) === String(id));
+      if (match) return { data: normalizeProduct(match), status: 200, statusText: 'OK', headers: {}, config: {} } as any;
+      throw error;
+    }
+  },
+};
+
 export const cartApi = { reportAbandoned: (cartData: any) => api.post('/cart/abandoned', cartData) };
 
 const compressImage = (file: File, maxBytes = 2 * 1024 * 1024): Promise<File> => new Promise((resolve) => {
