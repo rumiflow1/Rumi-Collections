@@ -6,109 +6,43 @@ import { ShieldCheck, CreditCard, ChevronRight, Truck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi, orderApi } from '../services/api';
 import { useConfig } from '../context/ConfigContext';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext, Currency, convertCurrency } from '../context/AppContext';
 
 const DISCOUNT_STORAGE_KEY = 'denfit_applied_discount_v2';
+const CURRENCIES: Currency[] = ['USD','PKR','INR','SAR','EUR','GBP','AED'];
+const isCurrency = (v: any): v is Currency => CURRENCIES.includes(v);
 
 export default function Checkout() {
-  const { user } = useAuth();
-  const { cart, total, clearCart } = useCart();
-  const { SiteConfig } = useConfig();
-  const { formatPrice, addToast } = useAppContext();
-  const navigate = useNavigate();
-  const [profileData, setProfileData] = useState<any>(null);
-  const [discountPercent, setDiscountPercent] = useState(0);
-  const [discountCode, setDiscountCode] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isOrderPlaced, setIsOrderPlaced] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod'>('cod');
-  const [orderId, setOrderId] = useState<string | null>(null);
+  const { user } = useAuth(); const { cart, total, clearCart } = useCart(); const { SiteConfig } = useConfig(); const { currency, formatPrice, addToast } = useAppContext(); const navigate = useNavigate();
+  const [profileData, setProfileData] = useState<any>(null); const [discountPercent, setDiscountPercent] = useState(0); const [discountCode, setDiscountCode] = useState(''); const [isProcessing, setIsProcessing] = useState(false); const [isOrderPlaced, setIsOrderPlaced] = useState(false); const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod'>('cod'); const [orderId, setOrderId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ email: '', fullName: '', phone: '', address: '', city: '', zip: '', country: '' });
-
+  const baseCurrency: Currency = isCurrency(SiteConfig?.settings?.baseCurrency) ? SiteConfig.settings.baseCurrency : 'PKR';
   const shippingRules = SiteConfig?.settings?.shippingRules?.domestic || { flatFee: 200, freeThreshold: 3000 };
-  const freeThreshold = Number(shippingRules.freeThreshold || 3000);
-  const flatFee = Number(shippingRules.flatFee || 200);
-  const shippingCost = total >= freeThreshold ? 0 : flatFee;
-  const discountAmount = total * (discountPercent / 100);
-  const finalTotal = Math.max(0, total - discountAmount + shippingCost);
+  const freeThreshold = convertCurrency(Number(shippingRules.freeThreshold || 3000), baseCurrency, 'USD');
+  const flatFee = convertCurrency(Number(shippingRules.flatFee || 200), baseCurrency, 'USD');
+  const shippingCostUSD = total >= freeThreshold ? 0 : flatFee;
+  const discountAmountUSD = total * (discountPercent / 100); const finalTotalUSD = Math.max(0, total - discountAmountUSD + shippingCostUSD);
+  const displayTotal = convertCurrency(finalTotalUSD, 'USD', currency); const displayDiscount = convertCurrency(discountAmountUSD, 'USD', currency); const displayShipping = convertCurrency(shippingCostUSD, 'USD', currency);
 
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(DISCOUNT_STORAGE_KEY) || 'null');
-      if (saved?.code && Number(saved.percent) > 0) { setDiscountCode(String(saved.code)); setDiscountPercent(Number(saved.percent)); }
-    } catch { /* optional */ }
-  }, []);
-
-  useEffect(() => {
-    if (!user?.uid || user.uid === 'admin-hardcoded') return;
-    let cancelled = false;
-    authApi.getProfile(user.uid).then((response) => {
-      if (cancelled || !response.data) return;
-      const data = response.data;
-      setProfileData(data);
-      setFormData(prev => ({ ...prev, email: user.email || data.email || '', fullName: data.displayName || '', phone: data.phone || '' }));
-      const address = data.addresses?.[0];
-      if (address) setFormData(prev => ({ ...prev, address: address.street || address.address || '', city: address.city || '', zip: address.zip || '', country: address.country || '' }));
-    }).catch(() => { /* Checkout remains usable; customer can enter details manually. */ });
-    return () => { cancelled = true; };
-  }, [user]);
+  useEffect(() => { try { const saved = JSON.parse(sessionStorage.getItem(DISCOUNT_STORAGE_KEY) || 'null'); if (saved?.code && Number(saved.percent) > 0) { setDiscountCode(String(saved.code)); setDiscountPercent(Number(saved.percent)); } } catch {} }, []);
+  useEffect(() => { if (!user?.uid) return; let cancelled = false; authApi.getProfile(user.uid).then((response) => { if (cancelled || !response.data) return; const data = response.data; setProfileData(data); setFormData(prev => ({ ...prev, email: user.email || data.email || '', fullName: data.displayName || '', phone: data.phone || '' })); const address = data.addresses?.[0]; if (address) setFormData(prev => ({ ...prev, address: address.street || address.address || '', city: address.city || '', zip: address.zip || '', country: address.country || '' })); }).catch(() => {}); return () => { cancelled = true; }; }, [user]);
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.email || !formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.country) {
-      addToast('Please complete your contact and shipping details.', 'error');
-      return;
-    }
+    e.preventDefault(); if (!formData.email || !formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.country) { addToast('Please complete your contact and shipping details.', 'error'); return; }
     setIsProcessing(true);
     try {
-      const orderData = {
-        userId: user?.uid || 'GUEST', email: formData.email, fullName: formData.fullName, phone: formData.phone,
-        shippingAddress: { street: formData.address, city: formData.city, zip: formData.zip, country: formData.country },
-        paymentMethod, discountCode, discountPercent, discountAmount, subtotal: total, shippingCost, totalAmount: finalTotal,
-        items: cart, status: 'Pending'
-      };
-      const response = await orderApi.placeOrder(orderData);
-      const id = response.data.orderId || response.data.id || response.data._id;
-      setOrderId(id || null);
-      setIsOrderPlaced(true);
-      clearCart();
-      try { sessionStorage.removeItem(DISCOUNT_STORAGE_KEY); } catch { /* optional */ }
-    } catch (err: any) {
-      console.error('Failed to place order:', err);
-      addToast(err?.response?.data?.error || 'We could not place the order. Please try again.', 'error');
-    } finally { setIsProcessing(false); }
+      const convertedItems = cart.map((item: any) => ({ ...item, price: convertCurrency(Number(item.price || 0), isCurrency(item.currency) ? item.currency : 'USD', currency), currency }));
+      const subtotal = convertedItems.reduce((sum: number, item: any) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+      const shippingCost = currency === 'USD' ? shippingCostUSD : displayShipping; const discountAmount = subtotal * (discountPercent / 100); const totalAmount = Math.max(0, subtotal - discountAmount + shippingCost);
+      const orderData = { userId: user?.uid || 'GUEST', email: formData.email, fullName: formData.fullName, phone: formData.phone, shippingAddress: { street: formData.address, city: formData.city, zip: formData.zip, country: formData.country }, paymentMethod, discountCode, discountPercent, discountAmount, subtotal, shippingCost, totalAmount, currency, items: convertedItems, status: 'Pending' };
+      const response = await orderApi.placeOrder(orderData); const id = response.data.orderId || response.data.id || response.data._id; setOrderId(id || null); setIsOrderPlaced(true); clearCart(); try { sessionStorage.removeItem(DISCOUNT_STORAGE_KEY); } catch {}
+    } catch (err: any) { console.error('Failed to place order:', err); addToast(err?.response?.data?.error || 'We could not place the order. Please try again.', 'error'); } finally { setIsProcessing(false); }
   };
 
-  if (isOrderPlaced) return (
-    <div className="min-h-screen flex items-center justify-center bg-brand-cream/30 px-4">
-      <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md w-full bg-white p-12 text-center shadow-2xl border border-brand-dark/5">
-        <div className="w-20 h-20 bg-brand-gold/10 text-brand-gold rounded-full flex items-center justify-center mx-auto mb-8"><ShieldCheck size={40} /></div>
-        <h2 className="text-3xl font-serif font-bold mb-4 uppercase tracking-wider">Order Confirmed</h2>
-        {orderId && <p className="text-xs font-bold text-brand-gold mb-4 tracking-widest">ORDER #{orderId}</p>}
-        <p className="text-gray-500 text-sm leading-relaxed mb-10">Thank you for your order. We have received your details and will prepare your order for dispatch.</p>
-        <div className="space-y-4"><button onClick={() => navigate('/profile')} className="w-full btn-primary">Track Your Order</button><button onClick={() => navigate('/')} className="w-full text-[10px] font-bold tracking-widest uppercase text-gray-400 hover:text-brand-dark">Continue Shopping</button></div>
-      </motion.div>
-    </div>
-  );
-
+  if (isOrderPlaced) return <div className="min-h-screen flex items-center justify-center bg-brand-cream/30 px-4"><motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md w-full bg-white p-12 text-center shadow-2xl border border-brand-dark/5"><div className="w-20 h-20 bg-brand-gold/10 text-brand-gold rounded-full flex items-center justify-center mx-auto mb-8"><ShieldCheck size={40} /></div><h2 className="text-3xl font-serif font-bold mb-4 uppercase tracking-wider">Order Confirmed</h2>{orderId && <p className="text-xs font-bold text-brand-gold mb-4 tracking-widest">ORDER #{orderId}</p>}<p className="text-gray-500 text-sm leading-relaxed mb-10">Thank you for your order. We have received your details and will prepare your order for dispatch.</p><div className="space-y-4"><button onClick={() => navigate('/profile')} className="w-full btn-primary">Track Your Order</button><button onClick={() => navigate('/')} className="w-full text-[10px] font-bold tracking-widest uppercase text-gray-400 hover:text-brand-dark">Continue Shopping</button></div></motion.div></div>;
   if (cart.length === 0) return <div className="min-h-screen flex items-center justify-center bg-brand-cream"><div className="text-center space-y-4"><h2 className="text-2xl font-serif font-bold">Your bag is empty</h2><Link to="/products" className="btn-primary inline-block">Return to Shop</Link></div></div>;
 
-  return (
-    <main className="min-h-screen bg-brand-cream/30 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center mb-12"><Link to="/" className="mb-8"><h1 className="text-4xl font-serif font-bold tracking-[0.3em] uppercase">DENFIT</h1></Link><div className="flex items-center space-x-4 text-[10px] font-bold tracking-widest uppercase text-gray-400"><Link to="/cart" className="hover:text-brand-dark">Bag</Link><ChevronRight size={12} /><span className="text-brand-dark">Checkout</span><ChevronRight size={12} /><span>Confirmation</span></div></div>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          <div className="lg:col-span-7 space-y-8">
-            <form onSubmit={handlePlaceOrder} className="space-y-8">
-              <section className="bg-white p-8 border border-brand-dark/5 shadow-sm"><h2 className="text-xl font-serif font-bold mb-6">Contact Information</h2><div className="space-y-4"><input type="email" placeholder="Email Address" className="input-field" value={formData.email} onChange={e => setFormData({...formData, email:e.target.value})} required /><div className="grid grid-cols-2 gap-4"><input type="text" placeholder="Full Name" className="input-field" value={formData.fullName} onChange={e => setFormData({...formData, fullName:e.target.value})} required /><input type="tel" placeholder="Phone Number" className="input-field" value={formData.phone} onChange={e => setFormData({...formData, phone:e.target.value})} required /></div></div></section>
-              <section className="bg-white p-8 border border-brand-dark/5 shadow-sm"><div className="flex justify-between items-center mb-6"><h2 className="text-xl font-serif font-bold">Shipping Address</h2>{profileData?.addresses?.length > 0 && <span className="text-[10px] font-bold tracking-widest uppercase text-brand-gold">Saved address loaded</span>}</div><div className="space-y-4"><input type="text" placeholder="Street Address" className="input-field" value={formData.address} onChange={e => setFormData({...formData, address:e.target.value})} required /><div className="grid grid-cols-3 gap-4"><input type="text" placeholder="City" className="input-field" value={formData.city} onChange={e => setFormData({...formData, city:e.target.value})} required /><input type="text" placeholder="Postal Code" className="input-field" value={formData.zip} onChange={e => setFormData({...formData, zip:e.target.value})} /><input type="text" placeholder="Country" className="input-field" value={formData.country} onChange={e => setFormData({...formData, country:e.target.value})} required /></div></div></section>
-              <section className="bg-white p-8 border border-brand-dark/5 shadow-sm"><h2 className="text-xl font-serif font-bold mb-6">Payment Method</h2><div className="grid grid-cols-2 gap-4"><button type="button" onClick={() => setPaymentMethod('cod')} className={`p-4 border flex flex-col items-center space-y-2 transition-all ${paymentMethod === 'cod' ? 'border-brand-gold bg-brand-gold/5' : 'border-brand-dark/10 hover:border-brand-gold/50'}`}><Truck size={20} className={paymentMethod === 'cod' ? 'text-brand-gold' : 'text-gray-400'} /><span className="text-[10px] font-bold tracking-widest uppercase">Cash on Delivery</span></button><button type="button" onClick={() => setPaymentMethod('card')} className={`p-4 border flex flex-col items-center space-y-2 transition-all ${paymentMethod === 'card' ? 'border-brand-gold bg-brand-gold/5' : 'border-brand-dark/10 hover:border-brand-gold/50'}`}><CreditCard size={20} className={paymentMethod === 'card' ? 'text-brand-gold' : 'text-gray-400'} /><span className="text-[10px] font-bold tracking-widest uppercase">Card</span></button></div><div className="mt-6 flex items-center text-[10px] text-gray-400 uppercase tracking-widest"><ShieldCheck size={14} className="mr-2 text-brand-gold" />Secure payment processing</div></section>
-              <button type="submit" disabled={isProcessing} className="w-full btn-primary !py-5 text-base flex items-center justify-center">{isProcessing ? 'Processing…' : `Place Order • ${formatPrice(finalTotal)}`}</button>
-            </form>
-          </div>
-          <div className="lg:col-span-5"><div className="bg-white p-8 border border-brand-dark/5 shadow-sm sticky top-32"><h2 className="text-xl font-serif font-bold mb-8 border-b border-brand-dark/5 pb-4">Order Summary</h2><div className="max-h-[400px] overflow-y-auto pr-2 space-y-6 mb-8">{cart.map(item => <div key={`${item.productId}-${item.size}-${item.color}`} className="flex space-x-4"><div className="w-16 aspect-[3/4] bg-gray-100 flex-shrink-0"><img src={item.image} alt={item.name} className="w-full h-full object-cover" /></div><div className="flex-grow"><h4 className="text-sm font-bold tracking-tight">{item.name}</h4><p className="text-[10px] text-gray-400 uppercase tracking-widest">Qty: {item.quantity} | Size: {item.size}</p><p className="text-sm font-serif font-bold mt-1">{formatPrice(item.price * item.quantity)}</p></div></div>)}</div><div className="space-y-4 border-t border-brand-dark/5 pt-6"><div className="flex justify-between text-sm"><span className="text-gray-500">Subtotal</span><span className="font-bold">{formatPrice(total)}</span></div>{discountAmount > 0 && <div className="flex justify-between text-sm text-brand-gold"><span>Discount ({discountPercent}%)</span><span className="font-bold">-{formatPrice(discountAmount)}</span></div>}<div className="flex justify-between text-sm"><span className="text-gray-500">Shipping</span><span className="font-bold">{shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}</span></div><div className="flex justify-between text-lg font-serif font-bold pt-4 border-t border-brand-dark/5"><span>Total</span><span>{formatPrice(finalTotal)}</span></div></div><div className="mt-8 p-4 bg-brand-cream/50 border border-brand-gold/20 flex items-start space-x-3"><ShieldCheck size={20} className="text-brand-gold flex-shrink-0" /><p className="text-[10px] text-gray-500 leading-relaxed uppercase tracking-wider">Your order is protected by our secure checkout process.</p></div></div></div>
-        </div>
-      </div>
-    </main>
-  );
+  return <main className="min-h-screen bg-brand-cream/30 py-12"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="flex flex-col items-center mb-12"><Link to="/" className="mb-8"><h1 className="text-4xl font-serif font-bold tracking-[0.3em] uppercase">DENFIT</h1></Link><div className="flex items-center space-x-4 text-[10px] font-bold tracking-widest uppercase text-gray-400"><Link to="/cart" className="hover:text-brand-dark">Bag</Link><ChevronRight size={12} /><span className="text-brand-dark">Checkout</span><ChevronRight size={12} /><span>Confirmation</span></div></div>
+  <div className="grid grid-cols-1 lg:grid-cols-12 gap-12"><div className="lg:col-span-7 space-y-8"><form onSubmit={handlePlaceOrder} className="space-y-8"><section className="bg-white p-8 border border-brand-dark/5 shadow-sm"><h2 className="text-xl font-serif font-bold mb-6">Contact Information</h2><div className="space-y-4"><input type="email" placeholder="Email Address" className="input-field" value={formData.email} onChange={e => setFormData({...formData, email:e.target.value})} required /><div className="grid grid-cols-2 gap-4"><input type="text" placeholder="Full Name" className="input-field" value={formData.fullName} onChange={e => setFormData({...formData, fullName:e.target.value})} required /><input type="tel" placeholder="Phone Number" className="input-field" value={formData.phone} onChange={e => setFormData({...formData, phone:e.target.value})} required /></div></div></section><section className="bg-white p-8 border border-brand-dark/5 shadow-sm"><div className="flex justify-between items-center mb-6"><h2 className="text-xl font-serif font-bold">Shipping Address</h2>{profileData?.addresses?.length > 0 && <span className="text-[10px] font-bold tracking-widest uppercase text-brand-gold">Saved address loaded</span>}</div><div className="space-y-4"><input type="text" placeholder="Street Address" className="input-field" value={formData.address} onChange={e => setFormData({...formData, address:e.target.value})} required /><div className="grid grid-cols-3 gap-4"><input type="text" placeholder="City" className="input-field" value={formData.city} onChange={e => setFormData({...formData, city:e.target.value})} required /><input type="text" placeholder="Postal Code" className="input-field" value={formData.zip} onChange={e => setFormData({...formData, zip:e.target.value})} /><input type="text" placeholder="Country" className="input-field" value={formData.country} onChange={e => setFormData({...formData, country:e.target.value})} required /></div></div></section><section className="bg-white p-8 border border-brand-dark/5 shadow-sm"><h2 className="text-xl font-serif font-bold mb-6">Payment Method</h2><div className="grid grid-cols-2 gap-4"><button type="button" onClick={() => setPaymentMethod('cod')} className={`p-4 border flex flex-col items-center space-y-2 transition-all ${paymentMethod === 'cod' ? 'border-brand-gold bg-brand-gold/5' : 'border-brand-dark/10 hover:border-brand-gold/50'}`}><Truck size={20} className={paymentMethod === 'cod' ? 'text-brand-gold' : 'text-gray-400'} /><span className="text-[10px] font-bold tracking-widest uppercase">Cash on Delivery</span></button><button type="button" onClick={() => setPaymentMethod('card')} className={`p-4 border flex flex-col items-center space-y-2 transition-all ${paymentMethod === 'card' ? 'border-brand-gold bg-brand-gold/5' : 'border-brand-dark/10 hover:border-brand-gold/50'}`}><CreditCard size={20} className={paymentMethod === 'card' ? 'text-brand-gold' : 'text-gray-400'} /><span className="text-[10px] font-bold tracking-widest uppercase">Card</span></button></div><div className="mt-6 flex items-center text-[10px] text-gray-400 uppercase tracking-widest"><ShieldCheck size={14} className="mr-2 text-brand-gold" />Secure payment processing</div></section><button type="submit" disabled={isProcessing} className="w-full btn-primary !py-5 text-base flex items-center justify-center">{isProcessing ? 'Processing…' : `Place Order • ${formatPrice(displayTotal)}`}</button></form></div>
+  <div className="lg:col-span-5"><div className="bg-white p-8 border border-brand-dark/5 shadow-sm sticky top-32"><h2 className="text-xl font-serif font-bold mb-8 border-b border-brand-dark/5 pb-4">Order Summary <span className="text-[10px] text-brand-gold uppercase tracking-widest float-right">{currency}</span></h2><div className="max-h-[400px] overflow-y-auto pr-2 space-y-6 mb-8">{cart.map(item => <div key={`${item.productId}-${item.size}-${item.color}`} className="flex space-x-4"><div className="w-16 aspect-[3/4] bg-gray-100 flex-shrink-0"><img src={item.image} alt={item.name} className="w-full h-full object-cover" /></div><div className="flex-grow"><h4 className="text-sm font-bold tracking-tight">{item.name}</h4><p className="text-[10px] text-gray-400 uppercase tracking-widest">Qty: {item.quantity} | Size: {item.size}</p><p className="text-sm font-serif font-bold mt-1">{formatPrice(Number(item.price || 0) * Number(item.quantity || 1), isCurrency((item as any).currency) ? (item as any).currency : 'USD')}</p></div></div>)}</div><div className="space-y-4 border-t border-brand-dark/5 pt-6"><div className="flex justify-between text-sm"><span className="text-gray-500">Subtotal</span><span className="font-bold">{formatPrice(convertCurrency(total, 'USD', currency))}</span></div>{displayDiscount > 0 && <div className="flex justify-between text-sm text-brand-gold"><span>Discount ({discountPercent}%)</span><span className="font-bold">-{formatPrice(displayDiscount)}</span></div>}<div className="flex justify-between text-sm"><span className="text-gray-500">Shipping</span><span className="font-bold">{shippingCostUSD === 0 ? 'Complimentary' : formatPrice(displayShipping)}</span></div><div className="flex justify-between text-lg font-serif font-bold pt-4 border-t border-brand-dark/5"><span>Total</span><span>{formatPrice(displayTotal)}</span></div></div><div className="mt-8 p-4 bg-brand-cream/50 border border-brand-gold/20 flex items-start space-x-3"><ShieldCheck size={20} className="text-brand-gold flex-shrink-0" /><p className="text-[10px] text-gray-500 leading-relaxed uppercase tracking-wider">Your order is protected by our secure checkout process.</p></div></div></div></div></div></main>;
 }
