@@ -12,30 +12,35 @@ const CONFIG_CACHE_KEY = 'brand_site_config';
 const defaultGlobalConfig: Config = {
   elements: {}, branding: { brandName: BRAND.name, name: BRAND.name },
   announcementBar: { isVisible: true, bgColor: '#0A0A0A', items: [], socials: [] },
-  header: { isVisible: true, isCentered: false, logoText: BRAND.name, logoImage: '', logoColor: '#D4AF37', logoSize: '22px', logoWidth: '3rem', logoHeight: '3rem', logoPadding: '0px', logoFontFamily: 'Playfair Display', navLinks: [{ label: 'Shop All', path: '/products' }, { label: "Men's Collection", path: '/products?category=men' }, { label: "Women's Collection", path: '/products?category=women' }], search: { placeholder: 'Search the collection...', buttonText: 'Search', trendingTitle: 'Trending Now', trending: [], trendingProducts: [] }, account: { loginLabel: 'Login', signupLabel: 'Signup', emailLabel: 'Email Address', passwordLabel: 'Password', loginBtnText: 'Sign In', signupBtnText: 'Create Account' }, wishlist: { title: 'My Wishlist', emptyText: 'Your wishlist is empty.', btnText: 'Explore Collection' }, cart: { title: 'Your Selection', emptyText: 'Your cart is empty.', checkoutBtnText: 'Checkout Now', viewCartBtnText: 'View Full Cart' } },
+  header: { isVisible: true, isCentered: false, logoText: BRAND.name, logoImage: BRAND.logoUrl, logoColor: '#D4AF37', logoSize: '22px', logoWidth: '6rem', logoHeight: '4rem', logoPadding: '0px', logoFontFamily: 'Playfair Display', navLinks: [{ label: 'Shop All', path: '/products' }, { label: "Men's Collection", path: '/products?category=men' }, { label: "Women's Collection", path: '/products?category=women' }], search: { placeholder: 'Search the collection...', buttonText: 'Search', trendingTitle: 'Trending Now', trending: [], trendingProducts: [] }, account: { loginLabel: 'Login', signupLabel: 'Signup', emailLabel: 'Email Address', passwordLabel: 'Password', loginBtnText: 'Sign In', signupBtnText: 'Create Account' }, wishlist: { title: 'My Wishlist', emptyText: 'Your wishlist is empty.', btnText: 'Explore Collection' }, cart: { title: 'Your Selection', emptyText: 'Your cart is empty.', checkoutBtnText: 'Checkout Now', viewCartBtnText: 'View Full Cart' } },
   purchaseNotifications: { isVisible: true, items: [] }, heroBanner: { isVisible: true, slides: [] },
   newArrivals: { isVisible: true, title: 'New Arrivals', tagline: 'Fresh From The Collection' }, featuredArrivals: { isVisible: true, title: 'Featured Arrivals', tagline: 'Curated Selection' }, featuredCollections: { isVisible: true, title: 'Our Collections', items: [] }, customerReviews: { isVisible: true, title: 'Customer Reviews', tagline: 'What customers say', items: [] }, trustBadges: { isVisible: true, items: [] },
   footer: { isVisible: true, brandName: BRAND.name, description: 'Premium fashion, curated for you.', copyright: `© 2026 ${BRAND.name}. All rights reserved.`, shopLinks: [], supportLinks: [], socials: [] },
   aiConcierge: { isEnabled: true, brandVoice: 'Sophisticated, confident, and professional', systemInstruction: `You are an AI shopping assistant for ${BRAND.name}. Use current store data, answer naturally, and never invent unavailable facts.`, model: 'gemini-3.8-flash', welcomeMessage: `Hello. I’m your ${BRAND.name} shopping assistant.` },
-  notifications: { isLive: true, broadcastMessage: '', emailFrequency: 'Weekly' }, settings: { baseCurrency: 'PKR' }, pages: { shippingPolicy: '', privacyPolicy: '', returnPolicy: '', termsOfService: '', faq: '' }
+  notifications: { isLive: true, broadcastMessage: '', emailFrequency: 'Weekly' }, settings: { baseCurrency: 'PKR', currencyOptions: ['USD', 'PKR', 'INR', 'SAR', 'EUR', 'GBP', 'AED'] }, pages: { shippingPolicy: '', privacyPolicy: '', returnPolicy: '', termsOfService: '', faq: '' }
 };
 
 const asText = (value: any, fallback = ''): string => { if (typeof value === 'string' || typeof value === 'number') return String(value); if (value && typeof value === 'object') return asText(value.content ?? value.text ?? value.value ?? value.title, fallback); return fallback; };
 const replaceBrandDeep = (value: any): any => { if (typeof value === 'string') return normalizeBrandText(value); if (Array.isArray(value)) return value.map(replaceBrandDeep); if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, replaceBrandDeep(v)])); return value; };
-const sanitizeConfig = (config: any): Config => { const merged = replaceBrandDeep(mergeProductionConfig(config || {})); const elements = Object.fromEntries(Object.entries(merged.elements || {}).map(([key, raw]: any) => [key, { ...(raw || {}), content: asText(raw?.content ?? raw?.text, ''), color: asText(raw?.color, ''), fontFamily: asText(raw?.fontFamily, ''), fontSize: asText(raw?.fontSize, ''), link: asText(raw?.link, ''), background: asText(raw?.background, ''), isVisible: raw?.isVisible !== false }])); return { ...merged, branding: { ...(merged.branding || {}), brandName: BRAND.name, name: BRAND.name }, elements, header: { ...(merged.header || {}), logoText: BRAND.name }, footer: { ...(merged.footer || {}), brandName: BRAND.name, description: asText(merged.footer?.description, ''), copyright: `© 2026 ${BRAND.name}. All rights reserved.` }, aiConcierge: { ...(merged.aiConcierge || {}), model: 'gemini-3.8-flash', systemInstruction: `You are an AI shopping assistant for ${BRAND.name}. Use current store information, answer naturally, and never invent unavailable facts.` } } as Config; };
+const sanitizeConfig = (config: any): Config => {
+  const merged = replaceBrandDeep(mergeProductionConfig(config || {}));
+  const elements = Object.fromEntries(Object.entries(merged.elements || {}).map(([key, raw]: any) => [key, { ...(raw || {}), content: asText(raw?.content ?? raw?.text, ''), color: asText(raw?.color, ''), fontFamily: asText(raw?.fontFamily, ''), fontSize: asText(raw?.fontSize, ''), link: asText(raw?.link, ''), background: asText(raw?.background, ''), isVisible: raw?.isVisible !== false }]));
+  return { ...merged,
+    branding: { ...(merged.branding || {}), brandName: BRAND.name, name: BRAND.name },
+    elements,
+    header: { ...(merged.header || {}), logoText: BRAND.name, logoImage: BRAND.logoUrl },
+    footer: { ...(merged.footer || {}), brandName: BRAND.name, description: asText(merged.footer?.description, ''), copyright: `© 2026 ${BRAND.name}. All rights reserved.` },
+    aiConcierge: { ...(merged.aiConcierge || {}), model: 'gemini-3.8-flash', systemInstruction: `You are an AI shopping assistant for ${BRAND.name}. Use current store information, answer naturally, and never invent unavailable facts.` },
+    settings: { ...(merged.settings || {}), currencyOptions: Array.isArray(merged.settings?.currencyOptions) && merged.settings.currencyOptions.length ? merged.settings.currencyOptions : ['USD', 'PKR', 'INR', 'SAR', 'EUR', 'GBP', 'AED'] }
+  } as Config;
+};
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const [SiteConfig, setSiteConfig] = useState<Config>(() => { try { const cached = localStorage.getItem(CONFIG_CACHE_KEY); return cached ? sanitizeConfig(JSON.parse(cached)) : sanitizeConfig(defaultGlobalConfig); } catch { return sanitizeConfig(defaultGlobalConfig); } });
   const [loading, setLoading] = useState(true);
   const fetchConfig = async () => { try { const response = await axios.get('/api/config', { timeout: 5000 }); if (response.data) { const merged = sanitizeConfig(response.data); setSiteConfig(merged); localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(merged)); } } catch (error) { console.warn('Failed to refresh config:', error); } finally { setLoading(false); } };
   const getElement = (key: string) => SiteConfig?.elements?.[key] || null;
-  useEffect(() => {
-    fetchConfig();
-    const refresh = () => { if (document.visibilityState === 'visible') fetchConfig(); };
-    const interval = window.setInterval(fetchConfig, 30000);
-    document.addEventListener('visibilitychange', refresh);
-    return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
-  }, []);
+  useEffect(() => { fetchConfig(); const refresh = () => { if (document.visibilityState === 'visible') fetchConfig(); }; const interval = window.setInterval(fetchConfig, 30000); document.addEventListener('visibilitychange', refresh); return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', refresh); }; }, []);
   return <ConfigContext.Provider value={{ SiteConfig, loading, refreshConfig: fetchConfig, getElement }}>{children}</ConfigContext.Provider>;
 }
 export function useConfig() { const context = useContext(ConfigContext); if (!context) throw new Error('useConfig must be used within ConfigProvider'); return context; }
