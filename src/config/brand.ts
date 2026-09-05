@@ -7,3 +7,6 @@ export const BRAND = {
   siteUrl: (import.meta.env.VITE_SITE_URL || 'https://www.denfit.shop').replace(/\/$/, ''),
   supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || 'support@denfit.shop',
 } as const;
+
+// Kept as a compatibility API for older config consumers; new code should use BRAND directly.
+export const normalizeBrandText = (value: string) => value;
