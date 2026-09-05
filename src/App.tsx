@@ -30,11 +30,9 @@ import NewsletterPopup from './components/NewsletterPopup';
 
 const AdminRoute = ({ children, superAdminOnly = false }: { children: React.ReactNode; superAdminOnly?: boolean }) => {
   const { user, isAdmin, isSuperAdmin, loading } = useAuth();
-  
   if (loading) return <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center"><div className="w-12 h-12 border-4 border-brand-gold border-t-transparent rounded-full animate-spin"></div></div>;
   if (!user || !isAdmin) return <Navigate to="/auth" />;
   if (superAdminOnly && !isSuperAdmin) return <Navigate to="/" />;
-  
   return <>{children}</>;
 };
 
@@ -42,10 +40,7 @@ function ScrollToTop() {
   const { pathname, search } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
-    // Safety check for dynamic content
-    const timer = setTimeout(() => {
-      window.scrollTo(0, 0);
-    }, 100);
+    const timer = setTimeout(() => window.scrollTo(0, 0), 100);
     return () => clearTimeout(timer);
   }, [pathname, search]);
   return null;
@@ -58,13 +53,7 @@ function AppContent() {
   const isAdminPath = location.pathname.startsWith('/admin') || location.pathname.startsWith('/e-admin');
 
   if (isAdminPath) {
-    return (
-      <Routes>
-        <Route path="/admin" element={<AdminRoute><LuxeAdmin /></AdminRoute>} />
-        <Route path="/e-admin" element={<AdminRoute><LuxeAdmin /></AdminRoute>} />
-        <Route path="*" element={<Navigate to="/admin" />} />
-      </Routes>
-    );
+    return <Routes><Route path="/admin" element={<AdminRoute><LuxeAdmin /></AdminRoute>} /><Route path="/e-admin" element={<AdminRoute><LuxeAdmin /></AdminRoute>} /><Route path="*" element={<Navigate to="/admin" />} /></Routes>;
   }
 
   return (
@@ -83,6 +72,7 @@ function AppContent() {
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/contact" element={<Support />} />
+          <Route path="/support" element={<Support />} />
           <Route path="/shipping" element={<Support />} />
           <Route path="/returns" element={<Support />} />
           <Route path="/faq" element={<Support />} />
@@ -98,16 +88,5 @@ function AppContent() {
 }
 
 export default function App() {
-  return (
-    <ErrorBoundary>
-      <ConfigProvider>
-        <AppProvider>
-          <Router>
-            <ScrollToTop />
-            <AppContent />
-          </Router>
-        </AppProvider>
-      </ConfigProvider>
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary><ConfigProvider><AppProvider><Router><ScrollToTop /><AppContent /></Router></AppProvider></ConfigProvider></ErrorBoundary>;
 }
