@@ -5,8 +5,7 @@
 export const BRAND = {
   name: import.meta.env.VITE_BRAND_NAME || 'DENFIT',
   siteUrl: (import.meta.env.VITE_SITE_URL || 'https://www.denfit.shop').replace(/\/$/, ''),
-  logoUrl: import.meta.env.VITE_BRAND_LOGO_URL || 'https://www.denfit.shop/denfit-logo.svg',
   supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || 'support@denfit.shop',
 } as const;
-
+export const BRAND_LOGO_URL = `${BRAND.siteUrl}/denfit-logo.svg`;
 export const normalizeBrandText = (value: string) => value;
