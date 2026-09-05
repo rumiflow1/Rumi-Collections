@@ -59,21 +59,32 @@ api.interceptors.response.use((response) => {
 });
 
 export const authApi = {
-  syncUser: (userData: any) => api.post('/auth/sync', userData), getProfile: (uid: string) => api.get(`/user/profile/${uid}`),
-  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }), verifyCode: (email: string, code: string) => api.post('/auth/verify-code', { email, code }),
-  resetPassword: (email: string, code: string, newPassword: any) => api.post('/auth/reset-password', { email, code, newPassword }),
+  syncUser: (userData: any) => api.post('/auth/sync', userData),
+  getProfile: (uid: string) => api.get(`/user/profile/${uid}`),
+  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  verifyCode: (email: string, code: string) => api.post('/auth/verify-code', { email, code }),
+  resetPassword: (email: string, code: string, newPassword: string) => api.post('/auth/reset-password', { email, code, newPassword }),
+};
+
+export const discountApi = {
+  verify: (code: string, orderAmount = 0) => api.post('/discounts/verify', { code: code.trim().toUpperCase(), orderAmount }),
 };
 
 export const orderApi = {
   placeOrder: (orderData: any) => api.post('/orders/create', { ...orderData, shippingDetails: { firstName: orderData.fullName || '', lastName: '', email: orderData.email || '', phone: orderData.phone || '', address: { line1: orderData.shippingAddress?.street || '', city: orderData.shippingAddress?.city || '', state: orderData.shippingAddress?.state || '', postalCode: orderData.shippingAddress?.zip || '', country: orderData.shippingAddress?.country || '' } } }),
-  updateStatus: (id: string, status: string) => api.put(`/admin/orders/${id}/status`, { status }), getUserOrders: (userId: string) => api.get(`/admin/orders?userId=${encodeURIComponent(userId)}`),
+  updateStatus: (id: string, status: string) => api.put(`/admin/orders/${id}/status`, { status }),
+  getUserOrders: (userId: string) => api.get(`/admin/orders?userId=${encodeURIComponent(userId)}`),
 };
 
 export const adminApi = {
-  getOrders: () => api.get('/admin/orders'), getCustomers: () => api.get('/admin/customers'), getConfig: () => api.get('/config'), updateConfig: (config: any) => api.post('/admin/config', config),
+  getOrders: () => api.get('/admin/orders'),
+  getCustomers: () => api.get('/admin/customers'),
+  getConfig: () => api.get('/config'),
+  updateConfig: (config: any) => api.post('/admin/config', config),
   addProduct: (product: any) => api.post('/admin/products', normalizeProduct(product)),
   updateProduct: async (id: string, product: any) => { const payload = normalizeProduct(product); try { return await api.put(`/admin/products/${id}`, payload); } catch (error: any) { if (error?.response?.status !== 404 && error?.response?.status !== 405) throw error; await api.delete(`/admin/products/${id}`); return await api.post('/admin/products', payload); } },
-  deleteProduct: (id: string) => api.delete(`/admin/products/${id}`), logCustomerActivity: (data: any) => api.post('/admin/customers/log', data),
+  deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
+  logCustomerActivity: (data: any) => api.post('/admin/customers/log', data),
 };
 
 export const productApi = {
@@ -81,11 +92,12 @@ export const productApi = {
     const response = await api.get('/products');
     const raw = response.data?.products || response.data;
     if (Array.isArray(raw)) writeCachedProducts(raw);
-    return response;
+    return { ...response, data: Array.isArray(raw) ? raw.map(normalizeProduct) : [] };
   },
   getById: async (id: string) => {
     try {
-      return await api.get(`/products/${encodeURIComponent(id)}`);
+      const response = await api.get(`/products/${encodeURIComponent(id)}`);
+      return { ...response, data: normalizeProduct(response.data?.product || response.data) };
     } catch (error: any) {
       const cached = readCachedProducts();
       const match = cached.find((product: any) => String(product.id || product._id) === String(id));
