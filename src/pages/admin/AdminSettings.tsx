@@ -3,7 +3,7 @@ import { useConfig } from '../../context/ConfigContext';
 import axios from 'axios';
 import { Settings, Save, RefreshCw, Shield, Globe, Database, Server, Lock, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Currency } from '../../context/AppContext';
+import type { Currency } from '../../context/AppContext';
 
 const CURRENCIES: Currency[]=['USD','PKR','EUR','GBP','INR','SAR','AED'];
 export default function AdminSettings(){
