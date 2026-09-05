@@ -6,11 +6,6 @@ import App from './App.tsx';
 import './index.css';
 import { BRAND } from './config/brand';
 
-window.addEventListener('unhandledrejection', (event) => {
-  console.warn('Unhandled promise rejection:', event.reason);
-  event.preventDefault();
-});
-
 document.title = `${BRAND.name} — Premium Collection`;
 const setMeta = (name: string, content: string) => {
   let node = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
