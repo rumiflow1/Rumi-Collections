@@ -15,7 +15,8 @@ export const reviewApi={
   submit:(productId:string,data:any)=>api.post(`/products/${encodeURIComponent(productId)}/reviews`,data),
   getAdminQueue:()=>api.get('/admin/reviews'),
   addEditorial:(productId:string,data:any)=>api.post(`/admin/products/${encodeURIComponent(productId)}/reviews`,data),
-  setStatus:(productId:string,reviewId:string,status:'pending'|'approved'|'rejected')=>api.patch(`/admin/reviews/${encodeURIComponent(productId)}/${encodeURIComponent(reviewId)}`,{status}),
+  setStatus:(productId:string,reviewId:string,status:'pending'|'approved'|'rejected'|'hidden')=>api.patch(`/admin/reviews/${encodeURIComponent(productId)}/${encodeURIComponent(reviewId)}`,{status}),
+  edit:(productId:string,reviewId:string,data:any)=>api.put(`/admin/reviews/${encodeURIComponent(productId)}/${encodeURIComponent(reviewId)}`,data),
   remove:(productId:string,reviewId:string)=>api.delete(`/admin/reviews/${encodeURIComponent(productId)}/${encodeURIComponent(reviewId)}`)
 };
 export const tryOnApi={generate:(personImage:string,garmentImage:string,productName:string)=>api.post('/ai/try-on',{personImage,garmentImage,productName},{timeout:60000})};
