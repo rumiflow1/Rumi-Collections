@@ -18,7 +18,7 @@ export default function Auth() {
     signupTitle: 'Sign Up',
     signupSubtitle: 'Create Your Style Identity',
     recoveryTitle: 'Reset Password',
-    recoverySubtitleEmail: 'Enter email and we will send you a reset link.',
+    recoverySubtitleEmail: 'Enter your email and we will send you a verification code.',
     recoverySubtitleCode: 'A verification code was sent to your email.',
     recoverySubtitleReset: 'Create new password',
     leftImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=2070'
@@ -156,7 +156,8 @@ export default function Auth() {
         await authApi.verifyCode(email, resetCode);
         setForgotStep('reset');
       } else if (forgotStep === 'reset') {
-        if (password !== confirmPassword) throw new Error('Security keys do not match.');
+        if (password !== confirmPassword) throw new Error('Passwords do not match.');
+        if (password.length < 8) throw new Error('Use at least 8 characters for your new password.');
         await authApi.resetPassword(email, resetCode, password);
         addToast('Identity Credentials Updated.', 'success');
         setForgotStep('none');
