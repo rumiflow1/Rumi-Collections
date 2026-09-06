@@ -51,6 +51,9 @@ export default function Profile() {
     new: '',
     confirm: ''
   });
+  const formatOrderDate=(value:any)=>value?new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'long',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date(value)):'Pending';
+  const formatOrderMoney=(value:any,currency='USD')=>new Intl.NumberFormat('en-US',{style:'currency',currency:String(currency||'USD').toUpperCase(),maximumFractionDigits:2}).format(Number(value||0));
+  const statusClass=(status:string)=>{const key=String(status||'Pending').toLowerCase();if(key==='cancelled')return 'bg-red-100 text-red-700';if(key==='delivered')return 'bg-green-100 text-green-700';if(key==='shipped'||key==='on the way')return 'bg-blue-100 text-blue-700';if(key==='packed')return 'bg-purple-100 text-purple-700';if(key==='confirmed')return 'bg-indigo-100 text-indigo-700';return 'bg-amber-100 text-amber-700';};
 
   useEffect(() => {
     if (!user) return;
@@ -467,14 +470,14 @@ export default function Profile() {
                               </div>
                               <div>
                                 <p className="text-[9px] font-bold tracking-widest uppercase text-gray-400 mb-1">Date</p>
-                                <p className="text-xs font-medium">{new Date(order.createdAt || order.date).toLocaleDateString()}</p>
+                                <p className="text-xs font-medium">{formatOrderDate(order.createdAt || order.date)}</p>
                               </div>
                               <div>
                                 <p className="text-[9px] font-bold tracking-widest uppercase text-gray-400 mb-1">Total</p>
-                                <p className="text-xs font-serif font-bold text-brand-gold">${(order.totalAmount || order.total).toLocaleString()}</p>
+                                <p className="text-xs font-serif font-bold text-brand-gold">{formatOrderMoney(order.totalAmount ?? order.total, order.currency)}</p>
                               </div>
                             </div>
-                            <div className={`px-3 py-1 rounded-full text-[9px] font-bold tracking-widest uppercase ${order.status === 'Delivered' ? 'bg-green-100 text-green-700' : 'bg-brand-gold/10 text-brand-gold'}`}>
+                            <div className={`px-3 py-1 rounded-full text-[9px] font-bold tracking-widest uppercase ${statusClass(order.status)}`}>
                               {order.status}
                             </div>
                           </div>
@@ -489,7 +492,7 @@ export default function Profile() {
                                     <h4 className="text-xs font-bold uppercase tracking-widest">{item.name}</h4>
                                     <p className="text-[10px] text-gray-400 mt-1">Size: {item.size} | Color: {item.color} | Qty: {item.quantity}</p>
                                   </div>
-                                  <button className="text-[10px] font-bold tracking-widest uppercase text-brand-gold hover:underline">Track Order</button>
+                                  <span className="text-[10px] font-bold tracking-widest uppercase text-brand-gold">{order.trackingNumber || 'Tracking pending'}</span>
                                 </div>
                               ))}
                             </div>
@@ -498,15 +501,15 @@ export default function Profile() {
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="space-y-1">
                                   <p className="text-[9px] font-bold tracking-widest uppercase text-gray-400">Packed</p>
-                                  <p className="text-xs font-medium">{order.tracking?.packed || 'Pending'}</p>
+                                  <p className="text-xs font-medium">{formatOrderDate(order.tracking?.packed)}</p>
                                 </div>
                                 <div className="space-y-1">
                                   <p className="text-[9px] font-bold tracking-widest uppercase text-gray-400">Shipped</p>
-                                  <p className="text-xs font-medium">{order.tracking?.shipped || 'Pending'}</p>
+                                  <p className="text-xs font-medium">{formatOrderDate(order.tracking?.shipped)}</p>
                                 </div>
                                 <div className="space-y-1">
                                   <p className="text-[9px] font-bold tracking-widest uppercase text-gray-400">Delivered</p>
-                                  <p className="text-xs font-medium">{order.tracking?.delivered || 'Pending'}</p>
+                                  <p className="text-xs font-medium">{formatOrderDate(order.tracking?.delivered)}</p>
                                 </div>
                                 <div className="flex items-end">
                                   <button className="w-full py-2 bg-brand-dark text-white text-[9px] font-bold tracking-widest uppercase hover:bg-brand-gold transition-colors">
