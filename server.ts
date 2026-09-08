@@ -33,12 +33,16 @@ import {
 /**
  * startSovereignEngine: The main execution block for the Unified Server.
  */
+dotenv.config();
+
 async function startSovereignEngine() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   // CONNECTION PROTOCOL: MongoDB Atlas Handshake
-  const MONGODB_URI = "mongodb+srv://denfitreturns_db_user:Abdulmajid.516@cluster0.yie4wrd.mongodb.net/hayas_database?retryWrites=true&w=majority";
+  // Credentials must come from the environment and never from source control.
+  const MONGODB_URI = String(process.env.MONGODB_URI || "").trim();
+  if (!MONGODB_URI) throw new Error("MONGODB_URI is not configured");
   
   try {
     await mongoose.connect(MONGODB_URI);
@@ -69,7 +73,7 @@ async function startSovereignEngine() {
         }
 
         let raw = JSON.stringify(config);
-        const targetBrand = "STORE"; 
+        const targetBrand = String(process.env.BRAND_NAME || "DENFIT").trim() || "DENFIT"; 
         if (raw.includes("RUMY") || raw.includes("Rumi Atelier") || raw.includes("Lux 18") || raw.includes("LUXE ATTIRE")) {
           console.log("🛡️ [BRANDING GUARD]: Inconsistent Identity Detected. Commencing Purification...");
           const purified = raw.replace(/Rumi Atelier/g, targetBrand)
