@@ -43,6 +43,13 @@ export default function Auth() {
   const { addToast } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
+  const reviewReturnTo = (() => {
+    const value = new URLSearchParams(location.search).get('returnTo');
+    return value && value.startsWith('/') && !value.startsWith('//') ? value : '';
+  })();
+  const resolvedReturnTo = reviewReturnTo || (location.state as any)?.from?.pathname || (() => {
+    try { return sessionStorage.getItem('denfit:review:return') || '/profile'; } catch { return '/profile'; }
+  })();
 
   useEffect(() => {
     let interval: any;
@@ -63,8 +70,8 @@ export default function Auth() {
         console.log("🚀 [ADMIN REDIRECT]: Navigating to Sovereign Dashboard");
         navigate('/admin', { replace: true });
       } else {
-        const from = (location.state as any)?.from?.pathname || '/profile';
-        navigate(from, { replace: true });
+        const from = resolvedReturnTo;
+        try { sessionStorage.removeItem('denfit:review:return'); } catch {}\n        navigate(from, { replace: true });
       }
     }
   }, [user, isSuperAdmin, navigate, location, loading, authLoading]);
@@ -88,7 +95,7 @@ export default function Auth() {
       if (isHardcodedAdmin) {
         navigate('/admin', { replace: true });
       } else {
-        const from = (location.state as any)?.from?.pathname || '/profile';
+        const from = resolvedReturnTo;
         navigate(from, { replace: true });
       }
     } catch (err: any) {
@@ -114,7 +121,7 @@ export default function Auth() {
         if (email === 'admin@rumi.com') {
           navigate('/admin', { replace: true });
         } else {
-          const from = (location.state as any)?.from?.pathname || '/profile';
+          const from = resolvedReturnTo;
           navigate(from, { replace: true });
         }
       } else {
