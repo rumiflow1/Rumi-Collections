@@ -59,7 +59,8 @@ export default function Auth() {
   // FIXED: Removed stray '\n' character that was causing Vercel build to fail
   useEffect(() => {
     if (user && !loading && !authLoading) {
-      const isHardcodedAdmin = user.email === 'admin@rumi.com' || sessionStorage.getItem('hardcodedAdmin') === 'true';
+      const normalizedAdminEmail = String(user.email || '').trim().toLowerCase();
+      const isHardcodedAdmin = ['admin@rumi.com', 'admin@roomy.com'].includes(normalizedAdminEmail) || sessionStorage.getItem('hardcodedAdmin') === 'true';
       
       if (isSuperAdmin || isHardcodedAdmin) {
         navigate('/admin', { replace: true });
@@ -78,7 +79,8 @@ export default function Auth() {
       const result = await loginWithGoogle();
       addToast('Success. Redirecting...', 'success');
       
-      const isHardcodedAdmin = (result as any)?.user?.email === 'admin@rumi.com';
+      const normalizedAdminEmail = String((result as any)?.user?.email || '').trim().toLowerCase();
+      const isHardcodedAdmin = ['admin@rumi.com', 'admin@roomy.com'].includes(normalizedAdminEmail);
       if (isHardcodedAdmin) {
         navigate('/admin', { replace: true });
       } else {
@@ -103,7 +105,7 @@ export default function Auth() {
         await loginWithEmail(email, password);
         addToast('Identity Authenticated. Redirecting...', 'success');
         
-        if (email === 'admin@rumi.com') {
+        if (['admin@rumi.com', 'admin@roomy.com'].includes(email.trim().toLowerCase())) {
           navigate('/admin', { replace: true });
         } else {
           const from = resolvedReturnTo;
