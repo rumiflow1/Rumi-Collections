@@ -3,9 +3,9 @@ import {Check,X,Trash2,RefreshCw,Plus,Star,EyeOff,Edit3,Save}from 'lucide-react'
 import {productApi,reviewApi} from '../../services/api';
 
 export default function ReviewsAdmin(){
- const[reviews,setReviews]=useState<any[]>([]);const[products,setProducts]=useState<any[]>([]);const[loading,setLoading]=useState(true);const[busy,setBusy]=useState('');const[editing,setEditing]=useState<any|null>(null);
+ const[reviews,setReviews]=useState<any[]>([]);const[products,setProducts]=useState<any[]>([]);const[loading,setLoading]=useState(true);const[error,setError]=useState('');const[busy,setBusy]=useState('');const[editing,setEditing]=useState<any|null>(null);
  const[productId,setProductId]=useState('');const[name,setName]=useState('');const[comment,setComment]=useState('');const[rating,setRating]=useState(5);
- const load=async()=>{setLoading(true);try{const [queue,productResponse]=await Promise.all([reviewApi.getAdminQueue(),productApi.getAll()]);setReviews(queue.data?.reviews||[]);const rows=productResponse.data?.products||productResponse.data||[];setProducts(Array.isArray(rows)?rows:[]);}finally{setLoading(false)}};
+ const load=async()=>{setLoading(true);setError('');try{const [queue,productResponse]=await Promise.all([reviewApi.getAdminQueue(),productApi.getAll()]);setReviews(Array.isArray(queue.data?.reviews)?queue.data.reviews:[]);const rows=productResponse.data?.products||productResponse.data||[];setProducts(Array.isArray(rows)?rows:[]);}catch(err:any){console.error('[reviews-admin] load failed',err);setError(err?.response?.data?.error||'Reviews could not be loaded. Please refresh and try again.');setReviews([]);}finally{setLoading(false)}};
  useEffect(()=>{load()},[]);
  const setStatus=async(review:any,status:any)=>{setBusy(review.reviewId);try{await reviewApi.setStatus(review.productId,review.reviewId,status);await load()}finally{setBusy('')}};
  const remove=async(review:any)=>{if(!confirm('Delete this review permanently?'))return;setBusy(review.reviewId);try{await reviewApi.remove(review.productId,review.reviewId);await load()}finally{setBusy('')}};
