@@ -53,7 +53,7 @@ import { ArrowRight } from 'lucide-react';
 type AdminTab = 'dashboard' | 'products' | 'customers' | 'orders' | 'content' | 'ai' | 'notifications' | 'inventory' | 'marketing' | 'settings' | 'inquiries' | 'reviews';
 
 export default function EAdmin() {
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [loading, setLoading] = useState(true);
@@ -71,24 +71,19 @@ export default function EAdmin() {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
  useEffect(() => {
-    // 1. If the auth state is still loading, do nothing and wait.
-    // (We use loading from the fetchData state if useAuth doesn't have one)
-    if (!user && loading) return;
+    // Wait for Firebase auth to settle. Do not use dashboard data-loading state
+    // as an auth signal, otherwise a signed-out visit can remain on a spinner.
+    if (authLoading) return;
 
-    // 2. If the user is definitely not logged in, or the email is wrong:
-    if (!user || !['admin@rumi.com','admin@roomy.com'].includes(String(user.email || '').trim().toLowerCase())) {
-      // Small delay to ensure state is settled before redirecting
-      const timer = setTimeout(() => {
-        if (!user || !['admin@rumi.com','admin@roomy.com'].includes(String(user.email || '').trim().toLowerCase())) {
-          navigate('/');
-        }
-      }, 500); 
-      return () => clearTimeout(timer);
+    const normalizedEmail = String(user?.email || '').trim().toLowerCase();
+    const allowed = Boolean(isSuperAdmin) || ['admin@rumi.com','admin@roomy.com'].includes(normalizedEmail);
+    if (!user || !allowed) {
+      navigate('/auth', { replace: true });
+      return;
     }
 
-    // 3. If we are here, the email matches. Load the data.
     fetchData();
-  }, [user, navigate]);
+  }, [user, authLoading, isSuperAdmin, navigate]);
 
   const fetchData = async () => {
     setLoading(true);
