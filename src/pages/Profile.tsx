@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { db, handleFirestoreError } from '../firebase';
 import { OperationType } from '../types';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { Link } from 'react-router-dom';
 import { User, Shield, MapPin, CreditCard, LogOut, Camera, Star, ChevronRight, Heart, Package, Tag, Plus, Trash2, Check, ExternalLink, Loader2 } from 'lucide-react';
 import axios from 'axios';
@@ -117,8 +118,7 @@ export default function Profile() {
         displayName: formData.displayName,
         phone: formData.phone,
         photoURL: formData.photoURL,
-        coverURL: formData.coverURL,
-        password: formData.password
+        coverURL: formData.coverURL
       });
       setIsEditing(false);
       alert('Profile updated successfully.');
@@ -184,15 +184,37 @@ export default function Profile() {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     if (passwordForm.new !== passwordForm.confirm) {
       alert('Passwords do not match.');
       return;
     }
-    // In a real app, we'd use Firebase Auth updatePassword
-    // For this demo, we'll just simulate it
-    alert('Password updated successfully (simulated).');
-    setIsChangingPassword(false);
-    setPasswordForm({ current: '', new: '', confirm: '' });
+    if (passwordForm.new.length < 8) {
+      alert('Use at least 8 characters for your new password.');
+      return;
+    }
+    if (!user.email) {
+      alert('Password changes are not available for this account.');
+      return;
+    }
+    try {
+      const credential = EmailAuthProvider.credential(user.email, passwordForm.current);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, passwordForm.new);
+      alert('Password updated successfully.');
+      setIsChangingPassword(false);
+      setPasswordForm({ current: '', new: '', confirm: '' });
+    } catch (err: any) {
+      const code = String(err?.code || '');
+      if (code.includes('wrong-password') || code.includes('invalid-credential')) {
+        alert('Your current password is incorrect.');
+      } else if (code.includes('requires-recent-login')) {
+        alert('For security, please sign out and sign in again before changing your password.');
+      } else {
+        console.error('Password update failed:', err);
+        alert('We could not update your password. Please try again.');
+      }
+    }
   };
 
   const toggle2FA = async () => {
