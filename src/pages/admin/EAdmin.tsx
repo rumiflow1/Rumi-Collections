@@ -35,7 +35,8 @@ import {
   Bot,
   Bell,
   Mail,
-  Send
+  Send,
+  Star
 } from 'lucide-react';
 import { adminApi, productApi, orderApi as orderApiService } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
