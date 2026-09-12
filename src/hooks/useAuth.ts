@@ -38,11 +38,6 @@ export function useAuth() {
 
   useEffect(() => {
     let unsubProfile: (() => void) | null = null;
-    const hardcodedAdmin = sessionStorage.getItem('hardcodedAdmin');
-    if (hardcodedAdmin === 'true') {
-      setUser({ email: 'admin@rumi.com', uid: 'admin-hardcoded' } as User);
-      setIsAdmin(true); setIsSuperAdmin(true); setLoading(false);
-    }
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -76,9 +71,7 @@ export function useAuth() {
         }
       } else {
         if (unsubProfile) { unsubProfile(); unsubProfile = null; }
-        const currentHardcodedAdmin = sessionStorage.getItem('hardcodedAdmin');
-        if (currentHardcodedAdmin === 'true') { setUser({ email: 'admin@rumi.com', uid: 'admin-hardcoded' } as User); setIsAdmin(true); setIsSuperAdmin(true); setLoading(false); }
-        else { setUser(null); setProfileData(null); setIsAdmin(false); setIsSuperAdmin(false); setLoading(false); }
+        setUser(null); setProfileData(null); setIsAdmin(false); setIsSuperAdmin(false); setLoading(false);
       }
     });
     return () => { unsubscribe(); if (unsubProfile) unsubProfile(); };
@@ -86,20 +79,13 @@ export function useAuth() {
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const loginWithGoogle = async () => { if (isLoggingIn) return; setIsLoggingIn(true); try { return await signInWithPopup(auth, googleProvider); } finally { setIsLoggingIn(false); } };
-  const loginWithEmail = async (email: string, pass: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (normalizedEmail === 'admin@rumi.com' && pass === 'admin516') {
-      setIsAdmin(true); setIsSuperAdmin(true); sessionStorage.setItem('hardcodedAdmin', 'true');
-      const adminUser = { email: normalizedEmail, uid: 'admin-hardcoded' } as User; setUser(adminUser); setProfileData({ uid: 'admin-hardcoded', email: normalizedEmail, role: 'admin', displayName: 'Owner' }); setLoading(false); return { user: adminUser };
-    }
-    return signInWithEmailAndPassword(auth, normalizedEmail, pass);
-  };
+  const loginWithEmail = async (email: string, pass: string) => signInWithEmailAndPassword(auth, email.trim().toLowerCase(), pass);
   const signupWithEmail = async (email: string, pass: string, name: string, phone: string) => {
     const result = await createUserWithEmailAndPassword(auth, email.trim(), pass);
     await updateProfile(result.user, { displayName: name });
     await setDoc(doc(db, 'users', result.user.uid), { uid: result.user.uid, email: email.trim().toLowerCase(), displayName: name, phone, role: 'user', createdAt: serverTimestamp() });
     return result;
   };
-  const logout = async () => { try { const uid = auth.currentUser?.uid; if (uid) { try { sessionStorage.removeItem(`${AUTH_EVENT_KEY}:${uid}:login`); } catch {} } sessionStorage.removeItem('hardcodedAdmin'); await signOut(auth); } catch (error) { console.error('Logout failed:', error); } };
+  const logout = async () => { try { const uid = auth.currentUser?.uid; if (uid) { try { sessionStorage.removeItem(`${AUTH_EVENT_KEY}:${uid}:login`); } catch {} } await signOut(auth); } catch (error) { console.error('Logout failed:', error); } };
   return { user, profileData, loading, isAdmin, isSuperAdmin, loginWithGoogle, loginWithEmail, signupWithEmail, logout, reportActivityToBackend };
 }
