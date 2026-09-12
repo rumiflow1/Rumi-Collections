@@ -4,12 +4,8 @@ import { useAuth } from '../hooks/useAuth';
 import { useAppContext } from '../context/AppContext';
 import { useConfig } from '../context/ConfigContext';
 import { authApi } from '../services/api';
-import { Mail, Lock, User as UserIcon, ArrowRight, Chrome, AlertCircle, Eye, EyeOff, Key, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, ArrowRight, AlertCircle, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
-/**
- * SOVEREIGN AUTHENTICATION INTERFACE - LUXURY EDITION
- * Features: Multi-step Identity Recovery, Show Password, and Master Sync.
- */
 export default function Auth() {
   const { SiteConfig } = useConfig();
   const authConfig = SiteConfig?.auth || {
@@ -34,19 +30,20 @@ export default function Auth() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Luxury Identity Recovery States
   const [forgotStep, setForgotStep] = useState<'none' | 'email' | 'code' | 'reset'>('none');
   const [resetCode, setResetCode] = useState('');
   const [timer, setTimer] = useState(0);
 
-  const { user, isSuperAdmin, loading: authLoading, loginWithGoogle, loginWithEmail, signupWithEmail, reportActivityToBackend } = useAuth();
+  const { user, isSuperAdmin, loading: authLoading, loginWithGoogle, loginWithEmail, signupWithEmail } = useAuth();
   const { addToast } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
+  
   const reviewReturnTo = (() => {
     const value = new URLSearchParams(location.search).get('returnTo');
     return value && value.startsWith('/') && !value.startsWith('//') ? value : '';
   })();
+  
   const resolvedReturnTo = reviewReturnTo || (location.state as any)?.from?.pathname || (() => {
     try { return sessionStorage.getItem('denfit:review:return') || '/profile'; } catch { return '/profile'; }
   })();
@@ -59,39 +56,29 @@ export default function Auth() {
     return () => clearInterval(interval);
   }, [timer]);
 
-  // FIX 1: Added '!loading' and '!authLoading' condition here.
-  // Ab yeh tab tak redirect nahi karega jab tak Backend ko email send na ho jaye!
+  // FIXED: Removed stray '\n' character that was causing Vercel build to fail
   useEffect(() => {
     if (user && !loading && !authLoading) {
-      // Automatic Redirection based on Identity
       const isHardcodedAdmin = user.email === 'admin@rumi.com' || sessionStorage.getItem('hardcodedAdmin') === 'true';
       
       if (isSuperAdmin || isHardcodedAdmin) {
-        console.log("🚀 [ADMIN REDIRECT]: Navigating to Sovereign Dashboard");
         navigate('/admin', { replace: true });
       } else {
         const from = resolvedReturnTo;
-        try { sessionStorage.removeItem('denfit:review:return'); } catch {}\n        navigate(from, { replace: true });
+        try { sessionStorage.removeItem('denfit:review:return'); } catch {}
+        navigate(from, { replace: true }); // <-- YEH LINE AB SAFELY ALAG HAI
       }
     }
   }, [user, isSuperAdmin, navigate, location, loading, authLoading]);
 
   const handleGoogleLogin = async () => {
     setError('');
-    setLoading(true); // FIX 2: Added loading state to prevent premature navigation
+    setLoading(true);
     try {
       const result = await loginWithGoogle();
-
-      // FIX 3: Dynamically check if Google user is actually new or returning
-      const isNewUser = (result as any)?._tokenResponse?.isNewUser || 
-                       (result?.user?.metadata?.creationTime === result?.user?.metadata?.lastSignInTime);
-
-      // Sync handled by onAuthStateChanged in useAuth
-      
       addToast('Success. Redirecting...', 'success');
       
-      // Immediate redirection check
-      const isHardcodedAdmin = result.user.email === 'admin@rumi.com';
+      const isHardcodedAdmin = (result as any)?.user?.email === 'admin@rumi.com';
       if (isHardcodedAdmin) {
         navigate('/admin', { replace: true });
       } else {
@@ -113,11 +100,9 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const result = await loginWithEmail(email, password);
-        // Sync handled by onAuthStateChanged in useAuth
+        await loginWithEmail(email, password);
         addToast('Identity Authenticated. Redirecting...', 'success');
         
-        // Immediate redirection
         if (email === 'admin@rumi.com') {
           navigate('/admin', { replace: true });
         } else {
@@ -128,26 +113,22 @@ export default function Auth() {
         if (!name || !phone) throw new Error('Identity details incomplete.');
         if (password.length < 6) throw new Error('Security threshold requires 6+ characters.');
         
-        const result = await signupWithEmail(email, password, name, phone);
-        // Sync handled by onAuthStateChanged in useAuth
+        await signupWithEmail(email, password, name, phone);
         addToast('Account Created. Redirecting...', 'success');
         
-        // Immediate redirection
         const from = (location.state as any)?.from?.pathname || '/profile';
         navigate(from, { replace: true });
       }
-      
     } catch (err: any) {
       let msg = err.message;
       if (err.code === 'auth/wrong-password') msg = 'Invalid credentials for this identity.';
       setError(msg);
       addToast(msg, 'error');
     } finally {
-      setLoading(false); // FIX 4: Jab API call complete ho jayegi tab loading false hogi aur redirect chalega!
+      setLoading(false);
     }
   };
 
-  // --- LUXURY FORGOT PASSWORD HANDLER (Connected to Master Backend) ---
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -179,7 +160,6 @@ export default function Auth() {
     }
   };
 
-  // --- UI FOR IDENTITY RECOVERY ---
   if (forgotStep !== 'none') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FDFCFB] p-4">
@@ -237,11 +217,9 @@ export default function Auth() {
     );
   }
 
-  // --- MAIN UI RENDERING ---
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[#FDFCFB]">
       <div className="max-w-6xl w-full bg-white shadow-[0_50px_100px_-20px_rgba(0,0,0,0.1)] flex flex-col md:flex-row overflow-hidden border border-gray-100">
-        {/* Left Side: Editorial Backdrop */}
         <div className="hidden md:block md:w-1/2 relative bg-black">
           <img src={authConfig.leftImage} alt="Luxury" className="absolute inset-0 w-full h-full object-cover opacity-60" />
           <div className="absolute inset-0 flex flex-col justify-end p-16 text-white bg-gradient-to-t from-black/80 to-transparent">
@@ -250,7 +228,6 @@ export default function Auth() {
           </div>
         </div>
 
-        {/* Right Side: Identity Interface */}
         <div className="w-full md:w-1/2 p-10 md:p-20 flex flex-col justify-center">
           <div className="mb-12 text-center md:text-left">
             <h1 className="text-3xl font-serif font-bold text-black mb-2 uppercase tracking-[0.1em]">{isLogin ? authConfig.loginTitle : authConfig.signupTitle}</h1>
