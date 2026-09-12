@@ -46,9 +46,10 @@ import AIConcierge from './AIConcierge';
 import Notifications from './Notifications';
 import AdminSettings from './AdminSettings';
 import Footer from '../../components/Footer';
+import ReviewsAdmin from './ReviewsAdmin';
 import { ArrowRight } from 'lucide-react';
 
-type AdminTab = 'dashboard' | 'products' | 'customers' | 'orders' | 'content' | 'ai' | 'notifications' | 'inventory' | 'marketing' | 'settings' | 'inquiries';
+type AdminTab = 'dashboard' | 'products' | 'customers' | 'orders' | 'content' | 'ai' | 'notifications' | 'inventory' | 'marketing' | 'settings' | 'inquiries' | 'reviews';
 
 export default function EAdmin() {
   const { user, logout } = useAuth();
@@ -74,10 +75,10 @@ export default function EAdmin() {
     if (!user && loading) return;
 
     // 2. If the user is definitely not logged in, or the email is wrong:
-    if (!user || user.email !== 'admin@rumi.com') {
+    if (!user || !['admin@rumi.com','admin@roomy.com'].includes(String(user.email || '').trim().toLowerCase())) {
       // Small delay to ensure state is settled before redirecting
       const timer = setTimeout(() => {
-        if (!user || user.email !== 'admin@rumi.com') {
+        if (!user || !['admin@rumi.com','admin@roomy.com'].includes(String(user.email || '').trim().toLowerCase())) {
           navigate('/');
         }
       }, 500); 
@@ -213,6 +214,7 @@ export default function EAdmin() {
           <SidebarLink icon={<Bot size={20} />} label="AI Concierge" active={activeTab === 'ai'} onClick={() => setActiveTab('ai')} />
           <SidebarLink icon={<Mail size={20} />} label="Inquiries" active={activeTab === 'inquiries'} onClick={() => setActiveTab('inquiries')} />
           <SidebarLink icon={<Bell size={20} />} label="Notifications" active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')} />
+          <SidebarLink icon={<Star size={20} />} label="Reviews" active={activeTab === 'reviews'} onClick={() => setActiveTab('reviews')} />
           <SidebarLink icon={<Settings size={20} />} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
         </nav>
 
@@ -260,6 +262,7 @@ export default function EAdmin() {
             {activeTab === 'ai' && <AIConcierge />}
             {activeTab === 'inquiries' && <InquiryManagement inquiries={inquiries} onReply={fetchData} />}
             {activeTab === 'notifications' && <Notifications />}
+            {activeTab === 'reviews' && <ReviewsAdmin />}
             {activeTab === 'settings' && <AdminSettings />}
           </motion.div>
         </AnimatePresence>
