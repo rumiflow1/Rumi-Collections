@@ -7,15 +7,21 @@ import { useConfig } from '../context/ConfigContext';
 import { useAppContext, convertCurrency } from '../context/AppContext';
 import { BRAND, BRAND_LOGO_URL } from '../config/brand';
 
-const textOf = (value: any, fallback = '') => {
+// SAFE TEXT PARSER: Prevents React Error #31 by forcing everything to a safe string
+const safeText = (value: any, fallback = ''): string => {
   if (typeof value === 'string' || typeof value === 'number') return String(value);
-  if (value && typeof value === 'object') return String(value.name || value.title || value.text || value.content || value.message || fallback);
-  return fallback;
+  if (value && typeof value === 'object') return String(value.text || value.message || value.name || value.title || fallback);
+  return String(fallback);
 };
 
-const cleanResponse = (value: any) => {
-  const str = textOf(value, '');
-  return str.replace(/^#{1,6}\s*/gm, '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
+// Clean markdown-like symbols for a premium look without raw # or **
+const cleanResponse = (value: any): string => {
+  const text = safeText(value);
+  return text
+    .replace(/^#{1,6}\s*/gm, '') // Remove heading hashes
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markers
+    .replace(/`([^`]+)`/g, '$1') // Remove inline code ticks
+    .trim();
 };
 
 export default function AIStylistPro() {
@@ -26,8 +32,8 @@ export default function AIStylistPro() {
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   
   const { SiteConfig } = useConfig();
-  const runtimeBrand = textOf(SiteConfig?.branding?.brandName || SiteConfig?.branding?.name || BRAND.name, BRAND.name);
-  const runtimeLogo = textOf(SiteConfig?.branding?.logoUrl || SiteConfig?.header?.logoImage || BRAND_LOGO_URL, BRAND_LOGO_URL);
+  const runtimeBrand = safeText(SiteConfig?.branding?.brandName || SiteConfig?.branding?.name || BRAND.name, BRAND.name);
+  const runtimeLogo = safeText(SiteConfig?.branding?.logoUrl || SiteConfig?.header?.logoImage || BRAND_LOGO_URL, BRAND_LOGO_URL);
   const { products, currency } = useAppContext();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -41,76 +47,24 @@ export default function AIStylistPro() {
   [liveProducts]);
 
   const hasUserMessage = messages.some(m => m.role === 'user');
-  
+
   const quickSuggestions = useMemo(() => 
     [...new Set([
-      ...trending.slice(0, 3).map((p: any) => `Show ${textOf(p.name || p.title, 'this piece')}`),
+      ...trending.slice(0, 3).map((p: any) => `Show ${safeText(p.name || p.title, 'this piece')}`),
       ...(trending.some((p: any) => p.isNewArrival) ? ['New arrivals'] : []),
-      'Help me choose'
+      'Help me choose a style'
     ])].slice(0, 5), 
   [trending]);
 
   useEffect(() => {
     if (messages.length === 0 && SiteConfig) {
-      setMessages([{ role: 'ai', text: `Hello. I’m your ${runtimeBrand} personal concierge. I can help you discover pieces, compare styles and navigate the live store.` }]);
+      setMessages([{ role: 'ai', text: `Welcome to ${runtimeBrand}. I am your personal style concierge. How may I assist you in discovering our latest collections today?` }]);
     }
   }, [SiteConfig, runtimeBrand, messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
-
-  const speak = (text: string) => {
-    if (!isAudioEnabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.slice(0, 500));
-    window.speechSynthesis.speak(u);
-  };
-
-  const productHaystack = (p: any) => 
-    [textOf(p.name), textOf(p.title), textOf(p.category), textOf(p.collectionName), textOf(p.description), ...(Array.isArray(p.colors) ? p.colors : []), ...(Array.isArray(p.tags) ? p.tags : [])]
-    .map(textOf).filter(Boolean).join(' ').toLowerCase();
-
-  const findProduct = (query: string) => {
-    const q = query.toLowerCase().replace(/\b(show|open|find|give|me|please|the|a|an|product|item)\b/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!q) return null;
-    const terms = q.split(/\s+/).filter(Boolean);
-    return liveProducts.map((p: any) => {
-      const hay = productHaystack(p);
-      const name = textOf(p.name || p.title).toLowerCase();
-      const all = terms.every(t => hay.includes(t));
-      const score = (name === q ? 100 : 0) + (name.includes(q) ? 30 : 0) + terms.reduce((n: number, t: string) => n + (hay.includes(t) ? 1 : 0), 0);
-      return { p, all, score };
-    }).filter((x: any) => x.all && x.score > 0).sort((a: any, b: any) => b.score - a.score)[0]?.p || null;
-  };
-
-  const processNavigation = (text: string, already = false) => {
-    const regex = /\[(NAV|EXT):([^:\]]+)(?::([^\]]+))?\]/gi;
-    let done = already, m;
-    while ((m = regex.exec(text))) {
-      if (done) continue;
-      const kind = m[1].toUpperCase(), action = m[2].toUpperCase(), param = m[3]?.trim();
-      if (kind === 'NAV') {
-        if (action === 'HOME') navigate('/');
-        else if (action === 'PRODUCTS') navigate('/products');
-        else if (action === 'CART') navigate('/cart');
-        else if (action === 'LOGIN') navigate('/auth');
-        else if (action === 'PROFILE') navigate('/profile');
-        else if (action === 'CONTACT') navigate('/contact');
-        else if (action === 'FAQ') navigate('/support?tab=faq');
-        else if (action === 'PRODUCT' && param) {
-          const p = liveProducts.find((x: any) => String(x.id || x._id) === param);
-          if (p) navigate(`/product/${p.id || p._id}`);
-          else continue;
-        } else continue;
-        done = true;
-      } else if (kind === 'EXT' && param && /^https?:\/\//i.test(param)) {
-        window.open(param, '_blank', 'noopener,noreferrer');
-        done = true;
-      }
-    }
-    return done;
-  };
 
   const handleSend = async (preset?: string) => {
     const userMessage = String(preset ?? input).trim();
@@ -119,58 +73,25 @@ export default function AIStylistPro() {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setIsLoading(true);
-    
-    let immediateNavigation = false;
-    const q = userMessage.toLowerCase();
-    
-    if (/\b(login|sign in|signin)\b/i.test(q)) { navigate('/auth'); immediateNavigation = true; }
-    else if (/\bprofile\b/i.test(q)) { navigate('/profile'); immediateNavigation = true; }
-    else if (/\bfaq|faqs\b/i.test(q)) { navigate('/support?tab=faq'); immediateNavigation = true; }
-    else {
-      const p = findProduct(q);
-      if (p) { navigate(`/product/${p.id || p._id}`); immediateNavigation = true; }
-    }
 
     try {
       const history = messages.slice(-4).map(m => ({ role: m.role === 'user' ? 'user' : 'model', text: m.text }));
-      const compactProducts = liveProducts.map((p: any) => ({
-        id: p.id || p._id,
-        name: textOf(p.name || p.title, 'Product'),
-        price: convertCurrency(Number(p.price || 0), (String(p.currency || 'USD').toUpperCase() as any), currency),
-        currency,
-        image: textOf(p.image || p.images?.[0]),
-        category: textOf(p.category),
-        description: textOf(p.description).slice(0, 240),
-        colors: Array.isArray(p.colors) ? p.colors.slice(0, 8) : [],
-        sizes: Array.isArray(p.sizes) ? p.sizes.slice(0, 8) : [],
-        stock: Number(p.stock ?? 0),
-        isNewArrival: Boolean(p.isNewArrival),
-        isFeatured: Boolean(p.isFeatured),
-        isTrending: Boolean(p.isTrending)
-      }));
-
-      const response = await axios.post('/api/ai/stylist', {
-        message: userMessage,
+      
+      const response = await axios.post('/api/ai/stylist', { 
+        message: userMessage, 
         history,
-        products: compactProducts,
-        siteConfig: { header: SiteConfig?.header, footer: SiteConfig?.footer, pages: SiteConfig?.pages, settings: SiteConfig?.settings },
-        currency
+        currency 
       }, { timeout: 15000 });
 
-      const aiText = cleanResponse(response.data?.text || response.data?.message || 'I could not confirm enough live store information to answer that.');
-      processNavigation(aiText, immediateNavigation);
-      
-      let displayText = aiText.replace(/\[(?:NAV|EXT):[^\]]+\]/gi, '').trim();
-      if (!displayText) displayText = immediateNavigation ? 'Done — I opened the live destination for you.' : 'I could not find enough current store information to answer that.';
-      
-      setMessages(prev => [...prev, { role: 'ai', text: displayText }]);
-      speak(displayText);
+      // STRICTLY extract string to prevent React #31
+      const rawText = response.data?.text || response.data?.message || 'I apologize, but I am currently unable to process that request.';
+      const aiText = cleanResponse(rawText);
+
+      setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
     } catch (error: any) {
       console.error('AI Assistant error:', error);
-      // --- REACT #31 FIX: Safely extract error message ---
-      const rawError = error?.response?.data?.text || error?.response?.data?.error || error?.message || 'The live stylist is taking a moment. Please try again.';
-      const fallback = cleanResponse(rawError);
-      setMessages(prev => [...prev, { role: 'ai', text: fallback || 'The live stylist is taking a moment. Please try again.' }]);
+      const fallback = cleanResponse(error?.response?.data?.error || 'The stylist is momentarily unavailable. Please try again in a few seconds.');
+      setMessages(prev => [...prev, { role: 'ai', text: fallback }]);
     } finally {
       setIsLoading(false);
     }
@@ -181,107 +102,108 @@ export default function AIStylistPro() {
       <motion.button 
         initial={{ scale: 0, opacity: 0 }} 
         animate={{ scale: 1, opacity: 1 }} 
-        whileHover={{ scale: 1.06 }} 
-        whileTap={{ scale: .94 }} 
+        whileHover={{ scale: 1.05 }} 
+        whileTap={{ scale: 0.95 }} 
         onClick={() => setIsOpen(true)} 
-        className="fixed bottom-6 right-6 z-[60] bg-[#111] text-white p-3 rounded-full shadow-[0_20px_50px_rgba(0,0,0,.3)] border border-white/20" 
+        className="fixed bottom-6 right-6 z-[60] bg-[#0B1220] text-white p-4 rounded-full shadow-2xl border border-white/10"
         aria-label="Open personal concierge"
       >
-        <img src={runtimeLogo} alt={runtimeBrand} className="w-9 h-9 object-contain rounded-full bg-white" />
+        <img src={runtimeLogo} alt={runtimeBrand} className="w-8 h-8 object-contain rounded-full bg-white" />
       </motion.button>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div 
-            initial={{ opacity: 0, scale: .96, y: 20 }} 
+            initial={{ opacity: 0, scale: 0.96, y: 20 }} 
             animate={{ opacity: 1, scale: 1, y: 0 }} 
-            exit={{ opacity: 0, scale: .96, y: 20 }} 
-            className="fixed bottom-20 right-4 md:right-8 z-[100] w-[calc(100%-2rem)] md:w-[560px] h-[720px] max-h-[86vh] bg-white shadow-2xl flex flex-col overflow-hidden border border-black/10 rounded-2xl"
+            exit={{ opacity: 0, scale: 0.96, y: 20 }} 
+            className="fixed bottom-24 right-4 md:right-8 z-[100] w-[calc(100%-2rem)] md:w-[480px] h-[650px] max-h-[80vh] bg-white shadow-2xl flex flex-col overflow-hidden border border-gray-200 rounded-2xl"
           >
-            <div className="bg-[#080808] text-white p-4 flex justify-between items-center border-b border-white/10">
+            {/* Header */}
+            <div className="bg-[#0B1220] text-white p-4 flex justify-between items-center border-b border-white/10">
               <div className="flex items-center gap-3">
-                <img src={runtimeLogo} alt={runtimeBrand} className="w-10 h-10 object-contain rounded-lg bg-white" />
+                <img src={runtimeLogo} alt={runtimeBrand} className="w-10 h-10 object-contain rounded-lg bg-white p-1" />
                 <div>
-                  <div className="font-serif font-bold tracking-[.12em] text-sm">PERSONAL CONCIERGE</div>
-                  <div className="text-[9px] uppercase tracking-[.22em] text-white/55">{runtimeBrand} · Private Shopping Desk</div>
+                  <div className="font-serif font-bold tracking-[0.15em] text-sm">CONCIERGE</div>
+                  <div className="text-[9px] uppercase tracking-[0.2em] text-gray-400">{runtimeBrand} Private Desk</div>
                 </div>
-                <button 
-                  onClick={() => setIsAudioEnabled(v => !v)} 
-                  className={`p-1.5 rounded-full ml-1 ${isAudioEnabled ? 'bg-white text-black' : 'text-white/50 hover:bg-white/10'}`}
-                >
-                  {isAudioEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                </button>
               </div>
-              <button onClick={() => setIsOpen(false)} aria-label="Close"><X size={20} /></button>
+              <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Close">
+                <X size={20} />
+              </button>
             </div>
 
+            {/* Trending Suggestions (Only shown BEFORE first user message) */}
             {!hasUserMessage && (
-              <div className="hidden lg:block px-4 pt-4 bg-[#F8F5EE] border-b border-brand-dark/5">
+              <div className="px-4 pt-4 bg-[#F9F8F6] border-b border-gray-100">
                 <div className="flex items-end justify-between mb-3">
                   <div>
-                    <div className="text-[9px] font-bold uppercase tracking-[.24em] text-black">Curated live picks</div>
-                    <div className="text-sm font-serif font-bold text-brand-dark mt-1">Trending now</div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-gray-500">Curated Live Picks</div>
+                    <div className="text-sm font-serif font-bold text-[#0B1220] mt-1">Trending Now</div>
                   </div>
-                  <span className="text-[9px] uppercase tracking-widest text-gray-400">Tap to explore</span>
                 </div>
                 <div className="grid grid-cols-4 gap-2 pb-4">
                   {trending.map((p: any) => (
-                    <button key={String(p.id || p._id)} onClick={() => navigate(`/product/${p.id || p._id}`)} className="text-left group">
-                      <div className="aspect-[3/4] rounded-lg overflow-hidden bg-white border border-brand-dark/10">
-                        <img src={textOf(p.image || p.images?.[0])} alt={textOf(p.name || p.title, 'Product')} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <button key={String(p.id || p._id)} onClick={() => { navigate(`/product/${p.id || p._id}`); setIsOpen(false); }} className="text-left group">
+                      <div className="aspect-[3/4] rounded-lg overflow-hidden bg-white border border-gray-100">
+                        <img src={safeText(p.image || p.images?.[0])} alt={safeText(p.name || p.title, 'Product')} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>
-                      <div className="text-[9px] font-semibold text-brand-dark truncate mt-1.5">{textOf(p.name || p.title, 'Piece')}</div>
-                      <ArrowUpRight size={11} className="text-brand-dark mt-0.5" />
+                      <div className="text-[9px] font-semibold text-[#0B1220] truncate mt-1.5">{safeText(p.name || p.title, 'Piece')}</div>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
+            {/* Messages Area */}
             <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-white">
               {messages.map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[88%] p-3.5 text-sm whitespace-pre-line leading-relaxed ${msg.role === 'user' ? 'bg-[#080808] text-white rounded-2xl rounded-br-sm' : 'bg-[#F8F5EE] text-brand-dark border border-brand-dark/5 rounded-2xl rounded-bl-sm'}`}>
-                    {textOf(msg.text)}
+                  <div className={`max-w-[85%] p-3.5 text-sm whitespace-pre-wrap leading-relaxed ${
+                    msg.role === 'user' 
+                      ? 'bg-[#0B1220] text-white rounded-2xl rounded-br-sm' 
+                      : 'bg-[#F9F8F6] text-gray-800 border border-gray-100 rounded-2xl rounded-bl-sm'
+                  }`}>
+                    {/* STRICT STRING RENDERING HERE PREVENTS REACT #31 */}
+                    {String(msg.text)}
                   </div>
                 </div>
               ))}
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-[#F8F5EE] p-3.5 rounded-2xl flex items-center gap-2 text-xs text-gray-500">
-                    <Loader2 size={17} className="animate-spin text-brand-dark" /> Curating from the live collection…
+                  <div className="bg-[#F9F8F6] p-3.5 rounded-2xl flex items-center gap-2 text-xs text-gray-500 border border-gray-100">
+                    <Loader2 size={16} className="animate-spin text-[#0B1220]" /> 
+                    <span>Consulting the atelier...</span>
                   </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="px-4 pt-3 bg-white border-t border-brand-dark/5">
-              <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
-                {!hasUserMessage && quickSuggestions.map((s: string) => (
-                  <button 
-                    key={s} 
-                    onClick={() => handleSend(s)} 
-                    disabled={isLoading} 
-                    className="shrink-0 rounded-full border border-brand-dark/10 bg-[#F8F5EE] px-3 py-1.5 text-[10px] font-semibold tracking-wide text-brand-dark hover:border-black hover:text-black disabled:opacity-50"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+            {/* Input Area */}
+            <div className="px-4 pt-3 bg-white border-t border-gray-100">
+              {!hasUserMessage && (
+                <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
+                  {quickSuggestions.map((s: string, idx: number) => (
+                    <button key={idx} onClick={() => handleSend(s)} disabled={isLoading} className="shrink-0 rounded-full border border-gray-200 bg-[#F9F8F6] px-3 py-1.5 text-[10px] font-semibold tracking-wide text-[#0B1220] hover:border-[#0B1220] hover:bg-[#0B1220] hover:text-white transition-all disabled:opacity-50">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="pb-4 flex gap-2">
                 <input 
                   type="text" 
                   value={input} 
                   onChange={e => setInput(e.target.value)} 
                   onKeyDown={e => { if (e.key === 'Enter') handleSend(); }} 
-                  placeholder="Ask the concierge…" 
-                  className="flex-grow text-sm border border-brand-dark/10 rounded-xl px-3 py-2.5 focus:outline-none focus:border-black bg-white"
+                  placeholder="Ask your concierge..." 
+                  className="flex-grow text-sm border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#0B1220] focus:ring-1 focus:ring-[#0B1220] bg-white transition-all"
                 />
                 <button 
                   onClick={() => handleSend()} 
-                  disabled={isLoading} 
-                  className="w-10 h-10 rounded-xl bg-[#080808] text-white flex items-center justify-center hover:bg-[#333] hover:text-white disabled:opacity-50" 
+                  disabled={isLoading || !input.trim()} 
+                  className="w-12 h-12 rounded-xl bg-[#0B1220] text-white flex items-center justify-center hover:bg-[#1a253a] disabled:opacity-50 disabled:cursor-not-allowed transition-all" 
                   aria-label="Send"
                 >
                   <Send size={18} />
