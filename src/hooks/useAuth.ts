@@ -41,7 +41,7 @@ export function useAuth() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        const isMasterAuthority = firebaseUser.email?.trim().toLowerCase() === 'admin@rumi.com';
+        const isMasterAuthority = ['admin@rumi.com', 'admin@roomy.com'].includes(String(firebaseUser.email || '').trim().toLowerCase());
         if (isMasterAuthority) { setIsAdmin(true); setIsSuperAdmin(true); }
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         if (unsubProfile) unsubProfile();
