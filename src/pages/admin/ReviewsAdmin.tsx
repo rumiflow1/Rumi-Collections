@@ -1,24 +1,189 @@
-import {useEffect,useState}from 'react';
-import {Check,X,Trash2,RefreshCw,Plus,Star,EyeOff,Edit3,Save}from 'lucide-react';
-import {productApi,reviewApi} from '../../services/api';
+import { useEffect, useState } from 'react';
+import { Check, X, Trash2, RefreshCw, Plus, Star, EyeOff, Eye, Edit3, Save } from 'lucide-react';
+import { reviewApi } from '../../services/api';
 
-export default function ReviewsAdmin(){
- const[reviews,setReviews]=useState<any[]>([]);const[products,setProducts]=useState<any[]>([]);const[loading,setLoading]=useState(true);const[error,setError]=useState('');const[busy,setBusy]=useState('');const[editing,setEditing]=useState<any|null>(null);
- const[productId,setProductId]=useState('');const[name,setName]=useState('');const[comment,setComment]=useState('');const[rating,setRating]=useState(5);
- const load=async()=>{setLoading(true);setError('');try{const [queue,productResponse]=await Promise.all([reviewApi.getAdminQueue(),productApi.getAll()]);setReviews(Array.isArray(queue.data?.reviews)?queue.data.reviews:[]);const rows=productResponse.data?.products||productResponse.data||[];setProducts(Array.isArray(rows)?rows:[]);}catch(err:any){console.error('[reviews-admin] load failed',err);setError(err?.response?.data?.error||'Reviews could not be loaded. Please refresh and try again.');setReviews([]);}finally{setLoading(false)}};
- useEffect(()=>{load()},[]);
- const setStatus=async(review:any,status:any)=>{setBusy(review.reviewId);try{await reviewApi.setStatus(review.productId,review.reviewId,status);await load()}finally{setBusy('')}};
- const remove=async(review:any)=>{if(!confirm('Delete this review permanently?'))return;setBusy(review.reviewId);try{await reviewApi.remove(review.productId,review.reviewId);await load()}finally{setBusy('')}};
- const saveEdit=async()=>{if(!editing)return;setBusy(editing.reviewId);try{await reviewApi.edit(editing.productId,editing.reviewId,{customerName:editing.customerName,comment:editing.comment,rating:editing.rating,status:editing.status});setEditing(null);await load()}finally{setBusy('')}};
- const addEditorial=async()=>{if(!productId||!name.trim()||!comment.trim())return;setBusy('editorial');try{await reviewApi.addEditorial(productId,{customerName:name.trim(),comment:comment.trim(),rating});setName('');setComment('');setRating(5);await load()}finally{setBusy('')}};
- const pending=reviews.filter(r=>r.status==='pending'),published=reviews.filter(r=>r.status==='approved'),hidden=reviews.filter(r=>r.status==='hidden'||r.status==='rejected');
- const ReviewCard=({review}:{review:any})=><article className="bg-white border border-gray-200 p-5 shadow-[0_18px_45px_-38px_rgba(0,0,0,.6)]"><div className="flex justify-between gap-4"><div><div className="font-semibold text-brand-dark">{review.customerName}</div><div className="text-xs text-gray-400 mt-1">{review.email||'Manual entry'} · {review.productName}</div></div><div className="flex text-brand-gold">{[1,2,3,4,5].map(n=><Star key={n} size={13} fill={n<=Number(review.rating)?'currentColor':'none'}/>)}</div></div><p className="text-sm leading-6 text-gray-600 mt-4">{review.comment}</p><div className="mt-5 flex flex-wrap gap-2">{review.status!=='approved'&&<button disabled={busy===review.reviewId} onClick={()=>setStatus(review,'approved')} className="px-3 py-2 text-xs font-bold bg-green-700 text-white inline-flex items-center gap-1"><Check size={14}/>Approve</button>}<button disabled={busy===review.reviewId} onClick={()=>setStatus(review,'hidden')} className="px-3 py-2 text-xs font-bold bg-gray-800 text-white inline-flex items-center gap-1"><EyeOff size={14}/>Hide</button><button onClick={()=>setEditing({...review})} className="px-3 py-2 text-xs font-bold border border-gray-200 inline-flex items-center gap-1"><Edit3 size={14}/>Edit</button><button disabled={busy===review.reviewId} onClick={()=>remove(review)} className="px-3 py-2 text-xs font-bold border border-red-200 text-red-700 inline-flex items-center gap-1"><Trash2 size={14}/>Delete</button></div></article>;
- return <div className="min-h-screen bg-[#f6f4f0] p-5 md:p-10"><div className="max-w-7xl mx-auto"><div className="flex items-end justify-between gap-5 mb-8"><div><p className="text-[10px] tracking-[.3em] uppercase text-gray-500 font-bold">Customer content</p><h1 className="text-3xl md:text-4xl font-serif text-brand-dark mt-2">Review Studio</h1><p className="text-sm text-gray-500 mt-2">Approve, hide, edit or remove reviews before they become part of the public collection.</p></div><button onClick={load} className="p-3 border border-gray-200 bg-white"><RefreshCw size={18} className={loading?'animate-spin':''}/></button></div>
- {error&&<div role="alert" className="mb-6 border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</div>}<section className="grid lg:grid-cols-3 gap-6 mb-8"><div className="bg-white border border-gray-200 p-6"><div className="text-3xl font-serif">{pending.length}</div><div className="text-xs uppercase tracking-widest text-gray-400 mt-2">New submissions</div></div><div className="bg-white border border-gray-200 p-6"><div className="text-3xl font-serif">{published.length}</div><div className="text-xs uppercase tracking-widest text-gray-400 mt-2">Visible</div></div><div className="bg-white border border-gray-200 p-6"><div className="text-3xl font-serif">{hidden.length}</div><div className="text-xs uppercase tracking-widest text-gray-400 mt-2">Hidden</div></div></section>
- <section className="bg-white border border-gray-200 p-6 md:p-8 mb-8"><div className="flex items-center gap-2 mb-5"><Plus size={18}/><h2 className="font-serif text-2xl">Add a review entry</h2></div><p className="text-sm text-gray-500 mb-5">Manual entries are editable from this studio at any time.</p><div className="grid md:grid-cols-2 gap-4"><select value={productId} onChange={e=>setProductId(e.target.value)} className="border border-gray-200 p-3 bg-white"><option value="">Choose product</option>{products.map((p:any)=><option key={p.id||p._id} value={p.id||p._id}>{p.title||p.name}</option>)}</select><input value={name} onChange={e=>setName(e.target.value)} placeholder="Customer name" className="border border-gray-200 p-3"/></div><textarea value={comment} onChange={e=>setComment(e.target.value)} rows={4} placeholder="Review" className="w-full border border-gray-200 p-3 mt-4"/><div className="flex items-center justify-between mt-4"><div className="flex text-brand-gold">{[1,2,3,4,5].map(n=><button key={n} onClick={()=>setRating(n)}><Star size={20} fill={n<=rating?'currentColor':'none'}/></button>)}</div><button disabled={busy==='editorial'} onClick={addEditorial} className="bg-brand-dark text-white px-6 py-3 text-xs font-bold uppercase tracking-widest">{busy==='editorial'?'Saving…':'Add review'}</button></div></section>
- <section><h2 className="font-serif text-2xl mb-5">New customer reviews</h2><div className="grid md:grid-cols-2 gap-5">{pending.length?pending.map(r=><ReviewCard key={r.reviewId} review={r}/>):<div className="text-sm text-gray-500 py-10">No new reviews right now.</div>}</div></section>
- <section className="mt-10"><h2 className="font-serif text-2xl mb-5">Visible reviews</h2><div className="grid md:grid-cols-2 gap-5">{published.map(r=><ReviewCard key={r.reviewId} review={r}/>)}</div></section>
- <section className="mt-10"><h2 className="font-serif text-2xl mb-5">Hidden reviews</h2><div className="grid md:grid-cols-2 gap-5">{hidden.map(r=><ReviewCard key={r.reviewId} review={r}/>)}</div></section>
- {editing&&<div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4"><div className="w-full max-w-xl bg-white p-6 shadow-2xl"><div className="flex justify-between items-center mb-5"><h2 className="font-serif text-2xl">Edit review</h2><button onClick={()=>setEditing(null)}><X size={20}/></button></div><input value={editing.customerName||''} onChange={e=>setEditing({...editing,customerName:e.target.value})} className="w-full border border-gray-200 p-3 mb-3"/><textarea value={editing.comment||''} onChange={e=>setEditing({...editing,comment:e.target.value})} rows={5} className="w-full border border-gray-200 p-3"/><div className="flex justify-between items-center mt-4"><select value={editing.status||'pending'} onChange={e=>setEditing({...editing,status:e.target.value})} className="border p-3"><option value="pending">Pending</option><option value="approved">Visible</option><option value="hidden">Hidden</option><option value="rejected">Disapproved</option></select><button onClick={saveEdit} disabled={busy===editing.reviewId} className="bg-black text-white px-5 py-3 text-xs font-bold uppercase tracking-widest inline-flex gap-2 items-center"><Save size={15}/>Save changes</button></div></div></div>}
- </div></div>;
+export default function ReviewsAdmin() {
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState('');
+  
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newReview, setNewReview] = useState({ productId: '', customerName: '', rating: 5, comment: '' });
+  const [editing, setEditing] = useState<any>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await reviewApi.getAdminQueue();
+      setReviews(Array.isArray(response.data?.reviews) ? response.data.reviews : []);
+    } catch (err: any) {
+      console.error('[reviews-admin] load failed', err);
+      setError('Reviews could not be loaded. Please refresh.');
+      setReviews([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const setStatus = async (reviewId: string, status: string) => {
+    setBusy(reviewId);
+    try {
+      await reviewApi.setStatus(reviewId, { status });
+      await load();
+    } finally { setBusy(''); }
+  };
+
+  const toggleVisibility = async (reviewId: string, currentVisibility: boolean) => {
+    setBusy(reviewId);
+    try {
+      await reviewApi.setStatus(reviewId, { isVisible: !currentVisibility });
+      await load();
+    } finally { setBusy(''); }
+  };
+
+  const remove = async (reviewId: string) => {
+    if (!confirm('Delete this review permanently? This cannot be undone.')) return;
+    setBusy(reviewId);
+    try {
+      await reviewApi.delete(reviewId);
+      await load();
+    } finally { setBusy(''); }
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setBusy(editing._id);
+    try {
+      await reviewApi.edit(editing._id, { 
+        customerName: editing.customerName, 
+        rating: editing.rating, 
+        comment: editing.comment 
+      });
+      setEditing(null);
+      await load();
+    } finally { setBusy(''); }
+  };
+
+  const addManual = async () => {
+    if (!newReview.productId || !newReview.customerName || !newReview.comment) {
+      alert('Please fill all required fields');
+      return;
+    }
+    try {
+      await reviewApi.addManual(newReview);
+      setShowAddModal(false);
+      setNewReview({ productId: '', customerName: '', rating: 5, comment: '' });
+      await load();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to add review');
+    }
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#f6f4f0]">Loading reviews…</div>;
+
+  return (
+    <div className="min-h-screen bg-[#f6f4f0] p-5 md:p-10">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <div>
+            <p className="text-[10px] tracking-[.3em] uppercase text-gray-500 font-bold">Moderation</p>
+            <h1 className="text-3xl md:text-4xl font-serif mt-2">Customer Reviews</h1>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={load} className="p-2 border border-gray-300 bg-white hover:bg-gray-50"><RefreshCw size={18} /></button>
+            <button onClick={() => setShowAddModal(true)} className="bg-gray-900 text-white px-4 py-2 text-xs font-bold tracking-widest uppercase flex items-center gap-2">
+              <Plus size={16} /> Add Manual Review
+            </button>
+          </div>
+        </div>
+
+        {error && <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm border border-red-200">{error}</div>}
+
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white p-6 max-w-md w-full space-y-4">
+              <h3 className="text-lg font-serif font-bold">Add Manual Review</h3>
+              <input className="w-full border p-2 text-sm" placeholder="Product ID" value={newReview.productId} onChange={e => setNewReview({...newReview, productId: e.target.value})} />
+              <input className="w-full border p-2 text-sm" placeholder="Customer Name" value={newReview.customerName} onChange={e => setNewReview({...newReview, customerName: e.target.value})} />
+              <select className="w-full border p-2 text-sm" value={newReview.rating} onChange={e => setNewReview({...newReview, rating: Number(e.target.value)})}>
+                {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} Stars</option>)}
+              </select>
+              <textarea className="w-full border p-2 text-sm" rows={3} placeholder="Review comment" value={newReview.comment} onChange={e => setNewReview({...newReview, comment: e.target.value})} />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm border">Cancel</button>
+                <button onClick={addManual} className="px-4 py-2 text-sm bg-gray-900 text-white">Publish</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white border border-gray-200 divide-y divide-gray-100">
+          {reviews.length === 0 ? (
+            <div className="p-10 text-center text-gray-500 text-sm">No reviews found in the system.</div>
+          ) : (
+            reviews.map((review) => (
+              <div key={review._id} className="p-5 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex text-yellow-500">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={14} fill={i < review.rating ? 'currentColor' : 'none'} />
+                      ))}
+                    </div>
+                    <span className="text-xs text-gray-400 uppercase tracking-wider">{review.status}</span>
+                    {review.isManual && <span className="text-[10px] bg-gray-100 px-2 py-0.5 uppercase tracking-wider">Manual</span>}
+                  </div>
+                  
+                  {editing?._id === review._id ? (
+                    <div className="space-y-2">
+                      <input className="w-full border p-1 text-sm" value={editing.customerName} onChange={e => setEditing({...editing, customerName: e.target.value})} />
+                      <textarea className="w-full border p-1 text-sm" rows={2} value={editing.comment} onChange={e => setEditing({...editing, comment: e.target.value})} />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-sm">{review.customerName}</p>
+                      <p className="text-sm text-gray-600 italic">"{review.comment}"</p>
+                      <p className="text-[10px] text-gray-400">Product: {review.productId?.title || review.productId?.name || review.productId}</p>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {editing?._id === review._id ? (
+                    <button onClick={saveEdit} disabled={!!busy} className="p-2 bg-green-600 text-white"><Save size={16} /></button>
+                  ) : (
+                    <button onClick={() => setEditing(review)} disabled={!!busy} className="p-2 border hover:bg-gray-50" title="Edit"><Edit3 size={16} /></button>
+                  )}
+                  
+                  <button onClick={() => toggleVisibility(review._id, review.isVisible)} disabled={!!busy} className={`p-2 border ${review.isVisible ? 'text-gray-900' : 'text-gray-400'}`} title={review.isVisible ? "Hide" : "Unhide"}>
+                    {review.isVisible ? <Eye size={16} /> : <EyeOff size={16} />}
+                  </button>
+                  
+                  {review.status !== 'approved' && (
+                    <button onClick={() => setStatus(review._id, 'approved')} disabled={!!busy} className="p-2 border border-green-200 text-green-700 hover:bg-green-50" title="Approve">
+                      <Check size={16} />
+                    </button>
+                  )}
+                  
+                  {review.status !== 'disapproved' && (
+                    <button onClick={() => setStatus(review._id, 'disapproved')} disabled={!!busy} className="p-2 border border-red-200 text-red-700 hover:bg-red-50" title="Disapprove">
+                      <X size={16} />
+                    </button>
+                  )}
+                  
+                  <button onClick={() => remove(review._id)} disabled={!!busy} className="p-2 border border-red-200 text-red-700 hover:bg-red-50" title="Delete Permanently">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
