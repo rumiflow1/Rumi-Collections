@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useAppContext } from '../context/AppContext';
 import { useConfig } from '../context/ConfigContext';
-import { authApi } from '../services/api';
+import { auth } from '../firebase';
+import { sendPasswordResetEmail, verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
 import { Mail, Lock, User as UserIcon, ArrowRight, AlertCircle, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 export default function Auth() {
@@ -30,9 +31,26 @@ export default function Auth() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const [forgotStep, setForgotStep] = useState<'none' | 'email' | 'code' | 'reset'>('none');
+  const [forgotStep, setForgotStep] = useState<'none' | 'email' | 'sent' | 'reset'>('none');
+  const [firebaseResetCode, setFirebaseResetCode] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [timer, setTimer] = useState(0);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+    if (mode !== 'resetPassword' || !oobCode) return;
+    setLoading(true);
+    verifyPasswordResetCode(auth, oobCode).then((accountEmail) => {
+      setEmail(accountEmail);
+      setFirebaseResetCode(oobCode);
+      setForgotStep('reset');
+    }).catch(() => {
+      setError('This password reset link is invalid or has expired. Please request a new one.');
+      setForgotStep('email');
+    }).finally(() => setLoading(false));
+  }, []);
 
   const { user, isSuperAdmin, loading: authLoading, loginWithGoogle, loginWithEmail, signupWithEmail } = useAuth();
   const { addToast } = useAppContext();
@@ -137,21 +155,27 @@ export default function Auth() {
     setError('');
     try {
       if (forgotStep === 'email') {
-        await authApi.forgotPassword(email);
-        setForgotStep('code');
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!normalizedEmail) throw new Error('Enter your account email address.');
+        await sendPasswordResetEmail(auth, normalizedEmail, {
+          url: window.location.origin + '/auth',
+          handleCodeInApp: true,
+        });
+        setForgotStep('sent');
         setTimer(60);
-        addToast('Security key dispatched to your atelier email.', 'success');
-      } else if (forgotStep === 'code') {
-        if (resetCode.length !== 6) throw new Error('Invalid 6-digit code provided.');
-        await authApi.verifyCode(email, resetCode);
-        setForgotStep('reset');
+        addToast('Password reset link sent. Open the email to choose a new password.', 'success');
       } else if (forgotStep === 'reset') {
+        if (!firebaseResetCode) throw new Error('This reset session is invalid. Please request a new password reset link.');
         if (password !== confirmPassword) throw new Error('Passwords do not match.');
         if (password.length < 8) throw new Error('Use at least 8 characters for your new password.');
-        await authApi.resetPassword(email, resetCode, password);
-        addToast('Identity Credentials Updated.', 'success');
+        await confirmPasswordReset(auth, firebaseResetCode, password);
+        addToast('Password updated successfully. You can now sign in.', 'success');
+        setPassword('');
+        setConfirmPassword('');
+        setFirebaseResetCode('');
         setForgotStep('none');
         setIsLogin(true);
+        navigate('/auth', { replace: true });
       }
     } catch (err: any) {
       const msg = err.response?.data?.error || err.message;
@@ -171,7 +195,7 @@ export default function Auth() {
             <h1 className="text-2xl font-serif tracking-[0.2em] uppercase">{authConfig.recoveryTitle}</h1>
             <p className="text-gray-400 text-[10px] mt-2 uppercase tracking-widest">
               {forgotStep === 'email' ? authConfig.recoverySubtitleEmail :
-               forgotStep === 'code' ? authConfig.recoverySubtitleCode : 
+               forgotStep === 'sent' ? 'We sent a secure password reset link to your email address.' :
                authConfig.recoverySubtitleReset}
             </p>
           </div>
@@ -184,13 +208,15 @@ export default function Auth() {
               </div>
             )}
 
-            {forgotStep === 'code' && (
+            {forgotStep === 'sent' && (
               <div className="space-y-4 text-center">
-                <input type="text" maxLength={6} placeholder="000000" className="w-full text-center text-3xl tracking-[0.6em] font-serif border-b py-4 focus:outline-none" value={resetCode} onChange={e => setResetCode(e.target.value.replace(/\D/g, ''))} required />
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-5 py-6 text-sm leading-6 text-emerald-900">
+                  Check your inbox for the secure reset link. Open that link on this device to choose a new password.
+                </div>
                 {timer > 0 ? (
-                  <p className="text-[10px] text-gray-400 uppercase tracking-widest">Key Valid for {timer}s</p>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-widest">You can request another link in {timer}s</p>
                 ) : (
-                  <button type="button" onClick={() => setForgotStep('email')} className="text-xs text-[#C5A059] font-bold underline">Resend Key</button>
+                  <button type="button" onClick={() => setForgotStep('email')} className="text-xs text-[#C5A059] font-bold underline">Send another link</button>
                 )}
               </div>
             )}
@@ -209,7 +235,7 @@ export default function Auth() {
             )}
 
             <button type="submit" disabled={loading} className="w-full bg-black text-white py-4 uppercase tracking-[0.3em] text-xs font-bold hover:opacity-80">
-              {loading ? 'Processing...' : 'Continue'}
+              {loading ? 'Processing...' : (forgotStep === 'sent' ? 'Check your email' : 'Continue')}
             </button>
 
             <button type="button" onClick={() => setForgotStep('none')} className="w-full text-[10px] text-gray-400 uppercase tracking-widest hover:text-black">Back to login</button>
